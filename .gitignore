@@ -17,9 +17,6 @@ data/raw/
 data/processed/
 data/external/
 
-# Models
-models/
-
 # OS files
 .DS_Store
 Thumbs.db
