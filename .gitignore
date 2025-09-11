@@ -9,14 +9,8 @@ env/
 venv/
 *.env
 
-# Jupyter Notebooks
-.ipynb_checkpoints
-
 # Data
 data/raw/
 data/processed/
 data/external/
 
-# OS files
-.DS_Store
-Thumbs.db
