@@ -10,7 +10,7 @@ venv/
 *.env
 
 # Data
-# data/raw/
-# data/processed/
-# data/external/
+data/raw/
+data/processed/
+data/external/
 
