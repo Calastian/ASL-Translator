@@ -8,7 +8,7 @@ __pycache__/
 env/
 venv/
 *.env
-
+myenv/
 # Data
 data/raw/
 data/processed/
