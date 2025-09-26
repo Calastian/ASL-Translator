@@ -1,3 +1,4 @@
+import os
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -7,7 +8,14 @@ mp_holistic = mp.solutions.holistic
 
 
 # 0 stands for the default video capture device, you can also file a file path in this parameter instead to read a video
-cap = cv2.VideoCapture(0)
+# cap = cv2.VideoCapture(0)
+
+rootdir = '../ASL_Citizen/videos' #replace with your own directory
+for dirpath, dirnames, filenames in os.walk(rootdir):
+    for filename in filenames:
+        if filename.endswith(".mp4") or filename.endswith(".mov"): #add more video formats if needed
+            cap = cv2.VideoCapture(os.path.join(dirpath, filename))
+# cap = cv2.VideoCapture()
 # Setup mediapipe holistic solution instance
 with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
     while cap.isOpened():
@@ -17,9 +25,9 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
         #error handling
         if not success:
             # If loading a video, use 'break' instead of 'continue'.
-            continue
-            #break
-        
+            #continue
+            break
+
         # Recolor image to RGB, openCV is weird like that
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image.flags.writeable = False
@@ -92,7 +100,7 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
             .get_default_pose_landmarks_style()) 
         
         #show new image in python window
-        cv2.imshow('Mediapipe Feed', image)
+        # cv2.imshow('Mediapipe Feed', image)
 
         ################
         #print landmarks
@@ -111,8 +119,8 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
                 print(modelOutput.right_hand_landmarks)
             if modelOutput.face_landmarks:
                 print(modelOutput.face_landmarks)
-            if modelOutput.segmentation_mask:
-               print(modelOutput.segmentation_mask)
+            # if modelOutput.segmentation_mask:
+            #    print(modelOutput.segmentation_mask)
 
             
 
@@ -122,6 +130,8 @@ with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=
         #quit if q is pressed
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
+        
+        break
         
     cap.release()
     cv2.destroyAllWindows()
