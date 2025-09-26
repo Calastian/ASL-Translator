@@ -105,6 +105,19 @@ def smooth_landmarks(landmarks_sequence, window_size=3):
     
     return smoothed.tolist()
 
+
+def extract_label(video_filename):
+    # Remove extension
+    name, _ = os.path.splitext(video_filename)
+    # Split by the first dash
+    parts = name.split('-', 1)
+    if len(parts) > 1:
+        label = parts[1].strip()
+    else:
+        label = name.strip()
+    return label
+
+
 def extract_landmarks_from_video(video_path, holistic_model, apply_processing=True):
     """Extract landmarks from a single video file with intelligent missing data handling."""
     cap = cv2.VideoCapture(video_path)
@@ -118,8 +131,12 @@ def extract_landmarks_from_video(video_path, holistic_model, apply_processing=Tr
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = total_frames / fps if fps > 0 else 0
     
+    # Extract label and trimmed video name
+    label = extract_label(os.path.basename(video_path))
+    
     landmarks_data = {
         'video_path': video_path,
+        'Label': label,
         'fps': fps,
         'total_frames': total_frames,
         'duration_seconds': duration,
@@ -222,7 +239,6 @@ def analyze_landmark_coverage(landmarks_data):
     right_hand_coverage = sum(1 for frame in landmarks_data['frames'] if frame['has_right_hand'])
     
     return {
-        'total_frames': total_frames,
         'pose_coverage': pose_coverage / total_frames * 100,
         'left_hand_coverage': left_hand_coverage / total_frames * 100,
         'right_hand_coverage': right_hand_coverage / total_frames * 100
