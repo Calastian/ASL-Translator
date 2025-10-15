@@ -6,6 +6,10 @@ import json
 from tqdm import tqdm
 import time
 from scipy import interpolate
+import pandas as pd
+
+# Set this to True if you want frame number and timestamp columns in the CSV, False to exclude them
+INCLUDE_FRAME_AND_TIME = False
 
 # Initialize MediaPipe
 mp_holistic = mp.solutions.holistic
@@ -107,6 +111,14 @@ def smooth_landmarks(landmarks_sequence, window_size=3):
 
 
 def extract_label(video_filename):
+    """_summary_
+
+    Args:
+        video_filename (_type_): Takes Video file path
+
+    Returns:
+        _type_: Returns 1 Word from file name after the -
+    """
     # Remove extension
     name, _ = os.path.splitext(video_filename)
     # Split by the first dash
@@ -211,8 +223,8 @@ def extract_landmarks_from_video(video_path, holistic_model, apply_processing=Tr
     # Create final frame data
     for i in range(frame_count):
         frame_data = {
-            'frame_number': i,
-            'timestamp': i / fps if fps > 0 else i,
+            'frame_number': i, # Turned off for Testing for model turn on for testing
+            'timestamp': i / fps if fps > 0 else i, # Turned off for Testing model turn on for testing
             'pose_landmarks_count': len(pose_sequence[i]),
             'pose_world_landmarks_count': len(pose_world_sequence[i]),
             'left_hand_landmarks_count': len(left_hand_sequence[i]),
@@ -221,7 +233,6 @@ def extract_landmarks_from_video(video_path, holistic_model, apply_processing=Tr
             'pose_world_landmarks': pose_world_sequence[i],
             'left_hand_landmarks': left_hand_sequence[i],
             'right_hand_landmarks': right_hand_sequence[i],
-            # Add metadata about landmark availability
             'has_pose': not np.all(np.array(pose_sequence[i]) == MISSING_VALUE),
             'has_left_hand': not np.all(np.array(left_hand_sequence[i]) == MISSING_VALUE),
             'has_right_hand': not np.all(np.array(right_hand_sequence[i]) == MISSING_VALUE)
@@ -249,88 +260,119 @@ def process_all_videos(root_dir, output_dir):
     
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
-    
+
     # Get list of all video files
     video_files = []
     for dirpath, dirnames, filenames in os.walk(root_dir):
         for filename in filenames:
             if filename.lower().endswith(('.mp4', '.mov', '.avi', '.mkv')):
                 video_files.append(os.path.join(dirpath, filename))
-    
+
     print(f"Found {len(video_files)} video files to process")
-    
+
     # Initialize MediaPipe Holistic with GPU acceleration
     with mp_holistic.Holistic(
-        min_detection_confidence=0.5, 
+        min_detection_confidence=0.5,
         min_tracking_confidence=0.5,
         model_complexity=1,  # Use lighter model for speed (0=lite, 1=full, 2=heavy)
         enable_segmentation=False,  # Disable segmentation for speed
         refine_face_landmarks=False,  # Disable face refinement for speed
         static_image_mode=False  # Dynamic mode for video processing
     ) as holistic:
-        
+
         processed_count = 0
         failed_count = 0
         start_time = time.time()
-        
+
         # Statistics tracking
         total_coverage_stats = {
             'pose_coverage': [],
             'left_hand_coverage': [],
             'right_hand_coverage': []
         }
-        
+
         for video_path in tqdm(video_files, desc="Processing videos"):
             try:
                 # Extract landmarks
                 landmarks_data = extract_landmarks_from_video(video_path, holistic, apply_processing=True)
-                
+
                 if landmarks_data:
                     # Analyze coverage
                     coverage_stats = analyze_landmark_coverage(landmarks_data)
-                    
+
                     # Add coverage stats to the data
                     landmarks_data['coverage_stats'] = coverage_stats
-                    
+
                     # Track overall statistics
                     total_coverage_stats['pose_coverage'].append(coverage_stats['pose_coverage'])
                     total_coverage_stats['left_hand_coverage'].append(coverage_stats['left_hand_coverage'])
                     total_coverage_stats['right_hand_coverage'].append(coverage_stats['right_hand_coverage'])
-                    
-                    # Save landmarks data
-                    video_name = os.path.splitext(os.path.basename(video_path))[0]
-                    output_path = os.path.join(output_dir, f"{video_name}_landmarks.json")
-                    
-                    with open(output_path, 'w') as f:
-                        json.dump(landmarks_data, f, indent=2)
-                    
+
+                    # Save landmarks data as wide-format CSV
+                    # video_name = os.path.splitext(os.path.basename(video_path))[0]
+                    video_name = extract_label(video_path)
+                    output_path = os.path.join(output_dir, f"{video_name}.csv")
+
+                    # Prepare CSV header
+                    n_pose = len(landmarks_data['frames'][0]['pose_landmarks']) if landmarks_data['frames'] else 0
+                    n_left = len(landmarks_data['frames'][0]['left_hand_landmarks']) if landmarks_data['frames'] else 0
+                    n_right = len(landmarks_data['frames'][0]['right_hand_landmarks']) if landmarks_data['frames'] else 0
+                    header = ['frame_number', 'timestamp']
+                    for i in range(n_pose):
+                        header.extend([f'pose_{i}_x', f'pose_{i}_y', f'pose_{i}_z'])
+                    for i in range(n_left):
+                        header.extend([f'left_{i}_x', f'left_{i}_y', f'left_{i}_z'])
+                    for i in range(n_right):
+                        header.extend([f'right_{i}_x', f'right_{i}_y', f'right_{i}_z'])
+
+                    # Write rows
+                    rows = []
+                    for frame in landmarks_data['frames']:
+                        row = [frame['frame_number'], frame['timestamp']]
+                        for lm in frame['pose_landmarks']:
+                            row.extend(lm)
+                        for lm in frame['left_hand_landmarks']:
+                            row.extend(lm)
+                        for lm in frame['right_hand_landmarks']:
+                            row.extend(lm)
+                        rows.append(row)
+                    import csv
+                    # Only create and save DataFrame if there is data
+                    if rows:
+                        df = pd.DataFrame(rows, columns=header)
+                        # Optionally drop the first two columns (frame_number, timestamp)
+                        if not INCLUDE_FRAME_AND_TIME:
+                            df = df.drop(df.columns[:2], axis=1)
+                        df.to_csv(output_path, index=False, float_format='%.7f')
+                    else:
+                        print(f"Warning: No frame data for {video_path}, CSV not written.")
                     processed_count += 1
                 else:
                     failed_count += 1
                     print(f"Failed to process: {video_path}")
-                    
+
             except Exception as e:
                 failed_count += 1
                 print(f"Error processing {video_path}: {str(e)}")
-            
-            # Print progress every 100 videos
+
+            # Print progress every video
             if (processed_count + failed_count) % 100 == 0:
                 elapsed_time = time.time() - start_time
                 avg_time_per_video = elapsed_time / (processed_count + failed_count)
                 remaining_videos = len(video_files) - (processed_count + failed_count)
                 estimated_time_remaining = avg_time_per_video * remaining_videos
-                
+
                 print(f"Progress: {processed_count + failed_count}/{len(video_files)}")
                 print(f"Successful: {processed_count}, Failed: {failed_count}")
                 print(f"Avg time per video: {avg_time_per_video:.2f}s")
                 print(f"Estimated time remaining: {estimated_time_remaining/3600:.2f} hours")
-                
+
                 if total_coverage_stats['pose_coverage']:
                     print(f"Avg coverage - Pose: {np.mean(total_coverage_stats['pose_coverage']):.1f}%, "
                           f"Left hand: {np.mean(total_coverage_stats['left_hand_coverage']):.1f}%, "
                           f"Right hand: {np.mean(total_coverage_stats['right_hand_coverage']):.1f}%")
                 print("-" * 50)
-    
+
     # Final statistics
     total_time = time.time() - start_time
     print(f"\nProcessing complete!")
@@ -338,7 +380,7 @@ def process_all_videos(root_dir, output_dir):
     print(f"Videos processed successfully: {processed_count}")
     print(f"Videos failed: {failed_count}")
     print(f"Average time per video: {total_time/len(video_files):.2f}s")
-    
+
     if total_coverage_stats['pose_coverage']:
         print(f"\nOverall Coverage Statistics:")
         print(f"Pose landmarks: {np.mean(total_coverage_stats['pose_coverage']):.1f}% ± {np.std(total_coverage_stats['pose_coverage']):.1f}%")
@@ -347,8 +389,8 @@ def process_all_videos(root_dir, output_dir):
 
 if __name__ == "__main__":
     # Configuration
-    root_dir = '../ASL_Citizen/test_videos'  # Your video directory
-    output_dir = '../ASL_Citizen/landmarks_2'  # Where to save landmark files
+    root_dir = '../ASL_Citizen/test_videos'  
+    output_dir = '../ASL_Citizen/landmarks_2' 
     
     # Process all videos
     process_all_videos(root_dir, output_dir)

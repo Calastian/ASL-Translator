@@ -9,6 +9,7 @@ env/
 venv/
 *.env
 myenv/
+power_env/
 # Data
 data/raw/
 data/processed/
