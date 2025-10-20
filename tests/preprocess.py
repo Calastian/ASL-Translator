@@ -5,9 +5,8 @@ import numpy as np
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_holistic = mp.solutions.holistic
+
 import pandas as pd
-
-
 
 # %% [markdown]
 # # Showing Video
@@ -328,10 +327,58 @@ def old_processVideo(cap, capType='video', showVideo=False, controllable=False)-
     
 
 # %%
-def processVideoFeed(deviceNum=0, showVideo:bool=False):
+def old_processVideoFeed(deviceNum=0, showVideo:bool=False):
     cap = cv2.VideoCapture(deviceNum) #0 is for default video
     
-    processVideo(cap, 'feed', showVideo)
+    old_processVideo(cap, 'feed', showVideo)
+    
+    cap.release()
+    cv2.destroyAllWindows()
+            
+    cap.release()
+
+# %%
+def processVideoFeed(deviceNum=0, showVideo:bool=True, controllable=True):
+    cap = cv2.VideoCapture(deviceNum) #0 is for default video
+    
+    data:dict = initialize_FrameModelOutput_Data()
+    # Setup mediapipe holistic solution instance
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        while cap.isOpened():
+            #get input
+            success, frame = cap.read()
+            
+            
+            #error handling
+            if not success:
+                # If loading a video, use 'break' if using live feed, use 'continue'.                
+                continue
+            
+            
+            modelOutput, image = getLandmarkOutput(frame, holistic) 
+            # tmp = modelOutputToLandmarkDict(modelOutput) #This line is just to see output laid out in a nicer dict, it's useful for trouble shooting
+            append_FrameModelOutput_Data(modelOutput, data)
+            
+            
+            if showVideo:
+                showFrame(image,modelOutput)
+
+
+            ##############
+            #Control Logic
+            ##############
+            if controllable:
+                keyPressed = cv2.waitKey(1) & 0xFF
+                #quit if q is pressed
+                if keyPressed == ord('q'):
+                    break
+                
+                #pause if p is pressed
+                if keyPressed == ord('p'):
+                    while cap.isOpened():
+                        #unpause if p is pressed again
+                        if cv2.waitKey(10) & 0xFF == ord('p'):
+                            break
     
     cap.release()
     cv2.destroyAllWindows()
@@ -342,11 +389,58 @@ def processVideoFeed(deviceNum=0, showVideo:bool=False):
 # # PreProcessing stuff
 
 # %%
-def processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
+def old_processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
     cap = cv2.VideoCapture(videoPath)
     #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps)
     
-    data = processVideo(cap, 'video',showVideo)
+    data = old_processVideo(cap, 'video',showVideo)
+            
+    cap.release()
+    cv2.destroyAllWindows()
+    return data
+
+# %%
+def processVideoFile(videoPath:str, showVideo:bool=False, controllable=False) -> dict:
+    cap = cv2.VideoCapture(videoPath)
+    #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps)
+    
+    data:dict = initialize_FrameModelOutput_Data()
+    # Setup mediapipe holistic solution instance
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        while cap.isOpened():
+            #get input
+            success, frame = cap.read()
+            
+            #error handling
+            if not success:
+                # If loading a video, use 'break' if using live feed, use 'continue'.
+                # continue
+                break
+            
+            modelOutput, image = getLandmarkOutput(frame, holistic) 
+            # tmp = modelOutputToLandmarkDict(modelOutput) #This line is just to see output laid out in a nicer dict, it's useful for trouble shooting
+            append_FrameModelOutput_Data(modelOutput, data)
+            
+            
+            if showVideo:
+                showFrame(image,modelOutput)
+
+
+            ##############
+            #Control Logic
+            ##############
+            if controllable:
+                keyPressed = cv2.waitKey(1) & 0xFF
+                #quit if q is pressed
+                if keyPressed == ord('q'):
+                    break
+                
+                #pause if p is pressed
+                if keyPressed == ord('p'):
+                    while cap.isOpened():
+                        #unpause if p is pressed again
+                        if cv2.waitKey(10) & 0xFF == ord('p'):
+                            break
             
     cap.release()
     cv2.destroyAllWindows()
