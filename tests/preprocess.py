@@ -330,7 +330,7 @@ def processVideo(cap, capType='video', showVideo=False, controllable=False)->dic
 def processVideoFeed(deviceNum=0, showVideo:bool=False):
     cap = cv2.VideoCapture(deviceNum) #0 is for default video
     
-    processVideo(cap, 'video', showVideo)
+    processVideo(cap, 'feed', showVideo)
     
     cap.release()
     cv2.destroyAllWindows()
@@ -345,7 +345,7 @@ def processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
     cap = cv2.VideoCapture(videoPath)
     #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps)
     
-    data = processVideo(cap, 'feed',showVideo)
+    data = processVideo(cap, 'video',showVideo)
             
     cap.release()
     cv2.destroyAllWindows()
@@ -366,7 +366,7 @@ def filterDF(df:pd.DataFrame, filterCSVPath)->pd.DataFrame:
     return df
 
 # %%
-def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None):
+def old_makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None):
     df = pd.read_csv(glossCSVPath)
     #df = df.head() #using only head as a proof of concept
     df = df[['Video file','Gloss']] #we only need file name and label
@@ -378,3 +378,40 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
     df = df.join(tmp,how='left') # we need to join the sign names with their respective data
 
     df.to_csv(outputCSVFilePath)
+
+# %%
+def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None, chunkSize = 10, startIndex=0):
+    df = pd.read_csv(glossCSVPath)
+    #df = df.head() #using only head as a proof of concept
+    df = df[['Video file','Gloss']] #we only need file name and label
+        
+    if filterCSVPath is not None:
+        df = filterDF(df, filterCSVPath)
+
+    numRows = len(df)
+    
+    for i in range(startIndex, numRows, chunkSize):
+        dfChunk = df[i:i+chunkSize].copy(deep=True)#using a deep copy so we don't write to main df and cause exsesive use of memory
+        
+        # The following block of old code takes up to much memory during code execution
+        tmp = dfChunk.apply(lambda row: processVideoFile(videoFolderPath + row['Video file']), axis=1, result_type='expand')#result_type='expand' unrolls the dictionaries from processVideoFile into a list of data frames, which allows us to join them later so we don't just get one big column, we get several columns
+        dfChunk = dfChunk.join(tmp,how='left') # we need to join the sign names with their respective data
+
+        # we need to use w for first chunk to clear out old stuff, and header needs to be written also
+        if i == 0:
+            writeMode = 'w'
+            writeHeader = True
+        else:
+            writeMode = 'a'
+            writeHeader = False
+            
+            
+        dfChunk.to_csv(outputCSVFilePath,mode=writeMode, header=writeHeader)
+        print(f"Processed videos {i} to {i+chunkSize-1}")
+    print(f"finished processing videos to {outputCSVFilePath}")
+
+# %%
+# makePreProcessedData('archive/ASL_Citizen/splits/train.csv','archive/ASL_Citizen/videos/',
+#                   'processedData/output.csv', 'Key_ASL.csv', chunkSize=5, startIndex=55)
+
+
