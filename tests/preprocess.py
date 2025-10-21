@@ -1,17 +1,16 @@
-# %%
 import cv2
 import mediapipe as mp
 import numpy as np
+import pandas as pd
+# pdb is for testing like gdb
+import pdb 
+
+
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_holistic = mp.solutions.holistic
 
-import pandas as pd
 
-# %% [markdown]
-# # Showing Video
-
-# %%
 def drawLandmarksOnImage(modelOutput, image):
     ###################
     # Render detections on image
@@ -58,7 +57,6 @@ def drawLandmarksOnImage(modelOutput, image):
         landmark_drawing_spec=mp_drawing_styles
         .get_default_pose_landmarks_style()) 
 
-# %%
 def showFrame(image, modelOutput):
     #show original frame
     cv2.imshow("Original Feed", image)
@@ -72,11 +70,7 @@ def showFrame(image, modelOutput):
     justDetections = blackScreen
     drawLandmarksOnImage(modelOutput, justDetections)
     cv2.imshow('Detections Feed', justDetections)
-
-# %% [markdown]
 # # Processesing tools
-
-# %%
 def getLandmarkOutput(frame, landmarkSolution):
     image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     image.flags.writeable = False
@@ -108,7 +102,6 @@ def getLandmarkOutput(frame, landmarkSolution):
     
     return landmarkOutput, image
 
-# %%
 def modelOutputToLandmarkDict(modelOutput) -> dict[str,dict[object,object]]:
     
     poseLandmarks = modelOutput.pose_landmarks.landmark if modelOutput.pose_landmarks is not None else None
@@ -172,7 +165,6 @@ def modelOutputToLandmarkDict(modelOutput) -> dict[str,dict[object,object]]:
     
     return formatedLandmarks
 
-# %%
 def initialize_FrameModelOutput_Data() -> dict[str, list]:
     """
     This Method initializes data dict with correct keys needed for append_FrameModelOutput_Data()
@@ -201,7 +193,6 @@ def initialize_FrameModelOutput_Data() -> dict[str, list]:
                                         
     return data
 
-# %%
 def append_FrameModelOutput_Data(modelOutput, data:dict[str, list]) -> dict[str,list]:  
     """
     This method expects data to be a dictionary initialized by initialize_FrameModelOutput_Data()
@@ -273,7 +264,6 @@ def append_FrameModelOutput_Data(modelOutput, data:dict[str, list]) -> dict[str,
                                         
     return data
 
-# %%
 def processVideo(cap, capType='video', showVideo=False, controllable=False)->dict:
     """
     This is a helper function with the purpose of encapsulation of the repeated pattern inside
@@ -326,7 +316,6 @@ def processVideo(cap, capType='video', showVideo=False, controllable=False)->dic
     return data
     
 
-# %%
 def processVideoFeed(deviceNum=0, showVideo:bool=False):
     cap = cv2.VideoCapture(deviceNum) #0 is for default video
     
@@ -337,13 +326,9 @@ def processVideoFeed(deviceNum=0, showVideo:bool=False):
             
     cap.release()
 
-# %% [markdown]
-# # PreProcessing stuff
-
-# %%
 def processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
     cap = cv2.VideoCapture(videoPath)
-    #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps)
+    #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps) technically no! parallel processing?
     
     data = processVideo(cap, 'feed',showVideo)
             
@@ -351,7 +336,7 @@ def processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
     cv2.destroyAllWindows()
     return data
 
-# %%
+
 def filterDF(df:pd.DataFrame, filterCSVPath)->pd.DataFrame:
     filterDF = pd.read_csv(filterCSVPath)
     filterList = filterDF['words'].tolist()
@@ -365,16 +350,18 @@ def filterDF(df:pd.DataFrame, filterCSVPath)->pd.DataFrame:
     
     return df
 
-# %%
 def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None):
     df = pd.read_csv(glossCSVPath)
     #df = df.head() #using only head as a proof of concept
     df = df[['Video file','Gloss']] #we only need file name and label
-        
     if filterCSVPath is not None:
         df = filterDF(df, filterCSVPath)
 
     tmp = df.apply(lambda row: processVideoFile(videoFolderPath + row['Video file']), axis=1, result_type='expand')#result_type='expand' unrolls the dictionaries from processVideoFile into a list of data frames, which allows us to join them later so we don't just get one big column, we get several columns
+    # maybe possibly making this add the process of the gpu accerlation with the test3.py if we can then incorporate the csv selectors with this script
+   
     df = df.join(tmp,how='left') # we need to join the sign names with their respective data
 
     df.to_csv(outputCSVFilePath)
+
+

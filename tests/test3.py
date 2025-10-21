@@ -19,7 +19,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # Use first GPU
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'  # Allow GPU memory growth
 
 # Constants for landmark handling
-MISSING_VALUE = -1.0  # Use -1.0 for missing landmarks (out of normalized range [0,1])
+MISSING_VALUE = -999.0  # Use -1.0 for missing landmarks (out of normalized range [0,1])
 POSE_LANDMARKS_COUNT = 33
 HAND_LANDMARKS_COUNT = 21
 
