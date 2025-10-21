@@ -264,7 +264,8 @@ def append_FrameModelOutput_Data(modelOutput, data:dict[str, list]) -> dict[str,
                                         
     return data
 
-def processVideo(cap, capType='video', showVideo=False, controllable=False)->dict:
+# %%
+def old_processVideo(cap, capType='video', showVideo=False, controllable=False)->dict:
     """
     This is a helper function with the purpose of encapsulation of the repeated pattern inside
     the different ways to process things.
@@ -316,21 +317,121 @@ def processVideo(cap, capType='video', showVideo=False, controllable=False)->dic
     return data
     
 
-def processVideoFeed(deviceNum=0, showVideo:bool=False):
+# %%
+def old_processVideoFeed(deviceNum=0, showVideo:bool=False):
     cap = cv2.VideoCapture(deviceNum) #0 is for default video
     
-    processVideo(cap, 'video', showVideo)
+    old_processVideo(cap, 'feed', showVideo)
     
     cap.release()
     cv2.destroyAllWindows()
             
     cap.release()
 
-def processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
-    cap = cv2.VideoCapture(videoPath)
-    #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps) technically no! parallel processing?
+# %%
+def processVideoFeed(deviceNum=0, showVideo:bool=True, controllable=True):
+    cap = cv2.VideoCapture(deviceNum) #0 is for default video
     
-    data = processVideo(cap, 'feed',showVideo)
+    data:dict = initialize_FrameModelOutput_Data()
+    # Setup mediapipe holistic solution instance
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        while cap.isOpened():
+            #get input
+            success, frame = cap.read()
+            
+            
+            #error handling
+            if not success:
+                # If loading a video, use 'break' if using live feed, use 'continue'.                
+                continue
+            
+            
+            modelOutput, image = getLandmarkOutput(frame, holistic) 
+            # tmp = modelOutputToLandmarkDict(modelOutput) #This line is just to see output laid out in a nicer dict, it's useful for trouble shooting
+            append_FrameModelOutput_Data(modelOutput, data)
+            
+            
+            if showVideo:
+                showFrame(image,modelOutput)
+
+
+            ##############
+            #Control Logic
+            ##############
+            if controllable:
+                keyPressed = cv2.waitKey(1) & 0xFF
+                #quit if q is pressed
+                if keyPressed == ord('q'):
+                    break
+                
+                #pause if p is pressed
+                if keyPressed == ord('p'):
+                    while cap.isOpened():
+                        #unpause if p is pressed again
+                        if cv2.waitKey(10) & 0xFF == ord('p'):
+                            break
+    
+    cap.release()
+    cv2.destroyAllWindows()
+            
+    cap.release()
+
+# %% [markdown]
+# # PreProcessing stuff
+
+# %%
+def old_processVideoFile(videoPath:str, showVideo:bool=False) -> dict:
+    cap = cv2.VideoCapture(videoPath)
+    #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps)
+    
+    data = old_processVideo(cap, 'video',showVideo)
+            
+    cap.release()
+    cv2.destroyAllWindows()
+    return data
+
+# %%
+def processVideoFile(videoPath:str, showVideo:bool=False, controllable=False) -> dict:
+    cap = cv2.VideoCapture(videoPath)
+    #?can you change the capture rate to be higher(this would help process mp4s faster, instead of the default 30 fps)
+    
+    data:dict = initialize_FrameModelOutput_Data()
+    # Setup mediapipe holistic solution instance
+    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+        while cap.isOpened():
+            #get input
+            success, frame = cap.read()
+            
+            #error handling
+            if not success:
+                # If loading a video, use 'break' if using live feed, use 'continue'.
+                # continue
+                break
+            
+            modelOutput, image = getLandmarkOutput(frame, holistic) 
+            # tmp = modelOutputToLandmarkDict(modelOutput) #This line is just to see output laid out in a nicer dict, it's useful for trouble shooting
+            append_FrameModelOutput_Data(modelOutput, data)
+            
+            
+            if showVideo:
+                showFrame(image,modelOutput)
+
+
+            ##############
+            #Control Logic
+            ##############
+            if controllable:
+                keyPressed = cv2.waitKey(1) & 0xFF
+                #quit if q is pressed
+                if keyPressed == ord('q'):
+                    break
+                
+                #pause if p is pressed
+                if keyPressed == ord('p'):
+                    while cap.isOpened():
+                        #unpause if p is pressed again
+                        if cv2.waitKey(10) & 0xFF == ord('p'):
+                            break
             
     cap.release()
     cv2.destroyAllWindows()
@@ -350,7 +451,8 @@ def filterDF(df:pd.DataFrame, filterCSVPath)->pd.DataFrame:
     
     return df
 
-def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None):
+# %%
+def old_makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None):
     df = pd.read_csv(glossCSVPath)
     #df = df.head() #using only head as a proof of concept
     df = df[['Video file','Gloss']] #we only need file name and label
@@ -363,5 +465,40 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
     df = df.join(tmp,how='left') # we need to join the sign names with their respective data
 
     df.to_csv(outputCSVFilePath)
+
+# %%
+def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None, chunkSize = 10, startIndex=0):
+    df = pd.read_csv(glossCSVPath)
+    #df = df.head() #using only head as a proof of concept
+    df = df[['Video file','Gloss']] #we only need file name and label
+        
+    if filterCSVPath is not None:
+        df = filterDF(df, filterCSVPath)
+
+    numRows = len(df)
+    
+    for i in range(startIndex, numRows, chunkSize):
+        dfChunk = df[i:i+chunkSize].copy(deep=True)#using a deep copy so we don't write to main df and cause exsesive use of memory
+        
+        # The following block of old code takes up to much memory during code execution
+        tmp = dfChunk.apply(lambda row: processVideoFile(videoFolderPath + row['Video file']), axis=1, result_type='expand')#result_type='expand' unrolls the dictionaries from processVideoFile into a list of data frames, which allows us to join them later so we don't just get one big column, we get several columns
+        dfChunk = dfChunk.join(tmp,how='left') # we need to join the sign names with their respective data
+
+        # we need to use w for first chunk to clear out old stuff, and header needs to be written also
+        if i == 0:
+            writeMode = 'w'
+            writeHeader = True
+        else:
+            writeMode = 'a'
+            writeHeader = False
+            
+            
+        dfChunk.to_csv(outputCSVFilePath,mode=writeMode, header=writeHeader)
+        print(f"Processed videos {i} to {i+chunkSize-1}")
+    print(f"finished processing videos to {outputCSVFilePath}")
+
+# %%
+# makePreProcessedData('archive/ASL_Citizen/splits/train.csv','archive/ASL_Citizen/videos/',
+#                   'processedData/output.csv', 'Key_ASL.csv', chunkSize=5, startIndex=55)
 
 
