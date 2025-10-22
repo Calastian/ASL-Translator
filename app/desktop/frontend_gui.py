@@ -278,6 +278,7 @@ class ScriptRunnerGUI:
             if p.poll() is None:
                 try:
                     p.kill()
+                    p.childProcess().kill()
                 except Exception:
                     pass
         t = threading.Thread(target=terminator, args=(proc,), daemon=True)
