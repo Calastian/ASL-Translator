@@ -53,7 +53,7 @@ class PositionEncoding(nn.Module):
         self.d_model=d_model
         
         #initializing lookup table
-        self.pe = torch.zeros(max_len, d_model)
+        pe = torch.zeros(max_len, d_model)
         
         #make list of possible positions then make them a column matrix for further math 
         # [
@@ -77,11 +77,11 @@ class PositionEncoding(nn.Module):
         div_term = 1/torch.tensor(10000.0)**(embedding_index / d_model)
         
         #save formulas using the respective indexes
-        self.pe[:, 0::2] = torch.sin(position * div_term)
-        self.pe[:, 1::2] = torch.cos(position * div_term) 
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term) 
         
         #this joins the pre computed stuff with the models, so if the model is on the gpu so is this stuff
-        self.register_buffer('pe', self.pe)
+        self.register_buffer('pe', pe)
         
     def forward(self, embeddings):
         """
@@ -331,8 +331,8 @@ class ASLDataset(Dataset):
             self.pdCache['landmarkDF'] = pd.read_csv(self.landmarkFile, skiprows=range(1,index+1), nrows=self.pdCacheSize)
             self.pdCache['oheDF'] = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=self.pdCacheSize)
             
-        X = self.pdCache['landmarkDF'].drop(columns=['Video file', 'Gloss'])
-        y = self.pdCache['oheDF'].drop(columns=['Video file'])
+        X = torch.from_numpy(self.pdCache['landmarkDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float64'))
+        y = torch.from_numpy(self.pdCache['oheDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float64'))
         
         return X, y
 
