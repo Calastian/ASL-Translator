@@ -162,12 +162,6 @@ class Attention(nn.Module):
         
         return attention_scores
 
-
-# # FeedForwardNeuralNetwork
-
-# In[ ]:
-
-
 class FeedForwardNetwork(nn.Module):
     def __init__(self, in_size:int, out_size:int, hidden_size:int|None=None, device=None):
         super().__init__()
@@ -186,10 +180,6 @@ class FeedForwardNetwork(nn.Module):
         return self.model(x)
     
 
-
-# # Encoder
-
-# In[ ]:
 
 
 class Encoder(L.LightningModule):
@@ -331,8 +321,8 @@ class ASLDataset(Dataset):
             self.pdCache['landmarkDF'] = pd.read_csv(self.landmarkFile, skiprows=range(1,index+1), nrows=self.pdCacheSize)
             self.pdCache['oheDF'] = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=self.pdCacheSize)
             
-        X = torch.from_numpy(self.pdCache['landmarkDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float64'))
-        y = torch.from_numpy(self.pdCache['oheDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float64'))
+        X = torch.from_numpy(self.pdCache['landmarkDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float32'))
+        y = torch.from_numpy(self.pdCache['oheDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float32'))
         
         return X, y
 

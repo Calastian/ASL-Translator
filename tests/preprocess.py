@@ -1,16 +1,17 @@
+# %%
 import cv2
 import mediapipe as mp
 import numpy as np
-import pandas as pd
-# pdb is for testing like gdb
-import pdb 
-
-
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_holistic = mp.solutions.holistic
 
+import pandas as pd
 
+# %% [markdown]
+# # Showing Video
+
+# %%
 def drawLandmarksOnImage(modelOutput, image):
     ###################
     # Render detections on image
@@ -57,6 +58,7 @@ def drawLandmarksOnImage(modelOutput, image):
         landmark_drawing_spec=mp_drawing_styles
         .get_default_pose_landmarks_style()) 
 
+# %%
 def showFrame(image, modelOutput):
     #show original frame
     cv2.imshow("Original Feed", image)
@@ -70,7 +72,11 @@ def showFrame(image, modelOutput):
     justDetections = blackScreen
     drawLandmarksOnImage(modelOutput, justDetections)
     cv2.imshow('Detections Feed', justDetections)
+
+# %% [markdown]
 # # Processesing tools
+
+# %%
 def getLandmarkOutput(frame, landmarkSolution):
     image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     image.flags.writeable = False
@@ -102,6 +108,7 @@ def getLandmarkOutput(frame, landmarkSolution):
     
     return landmarkOutput, image
 
+# %%
 def modelOutputToLandmarkDict(modelOutput) -> dict[str,dict[object,object]]:
     
     poseLandmarks = modelOutput.pose_landmarks.landmark if modelOutput.pose_landmarks is not None else None
@@ -165,6 +172,7 @@ def modelOutputToLandmarkDict(modelOutput) -> dict[str,dict[object,object]]:
     
     return formatedLandmarks
 
+# %%
 def initialize_FrameModelOutput_Data() -> dict[str, list]:
     """
     This Method initializes data dict with correct keys needed for append_FrameModelOutput_Data()
@@ -177,6 +185,10 @@ def initialize_FrameModelOutput_Data() -> dict[str, list]:
     #tuple for what we want to include in our data
     landmarkTypesWithEnums = (("poseLandmarks",poseEnum),("poseWorldLandmarks",poseEnum),
                                 ("leftHandLandmarks",handEnum),("rightHandLandmarks",handEnum))
+    
+    #define landmarks we don't wan
+    enumsFilter:list[str] = ['LEFT_HIP','RIGHT_HIP','LEFT_KNEE','RIGHT_KNEE','LEFT_ANKLE','RIGHT_ANKLE',
+                                'LEFT_HEEL','RIGHT_HEEL','LEFT_FOOT_INDEX','RIGHT_FOOT_INDEX']
                 
     for pair in landmarkTypesWithEnums:
         landmarkTypeName, enum = pair
@@ -185,14 +197,17 @@ def initialize_FrameModelOutput_Data() -> dict[str, list]:
         
         for enumerate in enum:
             
-            #.name is the name of the enum For example it is "NUM" in the enum NUM = 1
-            data.update({landmarkTypeName + "_" + enumerate.name + '_x': []})
-            data.update({landmarkTypeName + "_" + enumerate.name + '_y': []})
-            data.update({landmarkTypeName + "_" + enumerate.name + '_z': []})
-            data.update({landmarkTypeName + "_" + enumerate.name + '_present': []})
+            if enumerate.name not in enumsFilter:
+            
+                #.name is the name of the enum For example it is "NUM" in the enum NUM = 1
+                data.update({landmarkTypeName + "_" + enumerate.name + '_x': []})
+                data.update({landmarkTypeName + "_" + enumerate.name + '_y': []})
+                data.update({landmarkTypeName + "_" + enumerate.name + '_z': []})
+                data.update({landmarkTypeName + "_" + enumerate.name + '_present': []})
                                         
     return data
 
+# %%
 def append_FrameModelOutput_Data(modelOutput, data:dict[str, list]) -> dict[str,list]:  
     """
     This method expects data to be a dictionary initialized by initialize_FrameModelOutput_Data()
@@ -210,8 +225,11 @@ def append_FrameModelOutput_Data(modelOutput, data:dict[str, list]) -> dict[str,
     landmarkTypesWithEnums = (("poseLandmarks", poseLandmarks,poseEnum),("poseWorldLandmarks",poseWorldLandmarks,poseEnum),
                                 ("leftHandLandmarks",leftHandLandmarks,handEnum),("rightHandLandmarks",rightHandLandmarks,handEnum))
     
+    #define landmarks we don't wan
+    enumsFilter:list[str] = ['LEFT_HIP','RIGHT_HIP','LEFT_KNEE','RIGHT_KNEE','LEFT_ANKLE','RIGHT_ANKLE',
+                                'LEFT_HEEL','RIGHT_HEEL','LEFT_FOOT_INDEX','RIGHT_FOOT_INDEX']
+    
     #logic for turning data we want into a unified customly formated dictionary, instead of an unnamed tuple
-                
     for pair in landmarkTypesWithEnums:
         landmarkTypeName,landmarkType, enum = pair
         
@@ -221,46 +239,49 @@ def append_FrameModelOutput_Data(modelOutput, data:dict[str, list]) -> dict[str,
             
             for enumerate in enum:
                 
-                #.value is the value of the enum For example it is 1 in the enum NUM = 1
-                if landmarkType[enumerate.value] is not None: 
-                    landmarkX = landmarkType[enumerate.value].x
-                    landmarkY = landmarkType[enumerate.value].y
-                    landmarkZ = landmarkType[enumerate.value].z
-                    landmarkPresent = 1
-                else: # cordinate is normalizes to be in range 0..1 so we can use -1 to signify lack of presence in model
-                    landmarkX = -999
-                    landmarkY = -999
-                    landmarkZ = -999
-                    landmarkPresent = 0
-                
-                #.name is the name of the enum For example it is "NUM" in the enum NUM = 1
-                key = landmarkTypeName + "_" + enumerate.name + '_x'
-                data.update({key: data[key] + [landmarkX]})
-                key = landmarkTypeName + "_" + enumerate.name + '_y'
-                data.update({key: data[key] + [landmarkY]})
-                key = landmarkTypeName + "_" + enumerate.name + '_z'
-                data.update({key: data[key] + [landmarkZ]})
-                key = landmarkTypeName + "_" + enumerate.name + '_present'
-                data.update({key: data[key] + [landmarkPresent]})
+                if enumerate.name not in enumsFilter:
+                    
+                    #.value is the value of the enum For example it is 1 in the enum NUM = 1
+                    if landmarkType[enumerate.value] is not None: 
+                        landmarkX = landmarkType[enumerate.value].x
+                        landmarkY = landmarkType[enumerate.value].y
+                        landmarkZ = landmarkType[enumerate.value].z
+                        landmarkPresent = 1
+                    else: # cordinate is normalizes to be in range 0..1 so we can use -1 to signify lack of presence in model
+                        landmarkX = -999
+                        landmarkY = -999
+                        landmarkZ = -999
+                        landmarkPresent = 0
+                    
+                    #.name is the name of the enum For example it is "NUM" in the enum NUM = 1
+                    key = landmarkTypeName + "_" + enumerate.name + '_x'
+                    data.update({key: data[key] + [landmarkX]})
+                    key = landmarkTypeName + "_" + enumerate.name + '_y'
+                    data.update({key: data[key] + [landmarkY]})
+                    key = landmarkTypeName + "_" + enumerate.name + '_z'
+                    data.update({key: data[key] + [landmarkZ]})
+                    key = landmarkTypeName + "_" + enumerate.name + '_present'
+                    data.update({key: data[key] + [landmarkPresent]})
                                 
         else: #landmark type wasn't found so set all landmarks in type to not present and default
             key = landmarkTypeName + '_present'
             data.update({key: data[key] + [0]}) #1 for present 0 for not present
             
             for enumerate in enum:
-                landmarkX = -999
-                landmarkY = -999
-                landmarkZ = -999
-                landmarkPresent = 0
-                
-                key = landmarkTypeName + "_" + enumerate.name + '_x'
-                data.update({key: data[key] + [landmarkX]})
-                key = landmarkTypeName + "_" + enumerate.name + '_y'
-                data.update({key: data[key] + [landmarkY]})
-                key = landmarkTypeName + "_" + enumerate.name + '_z'
-                data.update({key: data[key] + [landmarkZ]})
-                key = landmarkTypeName + "_" + enumerate.name + '_present'
-                data.update({key: data[key] + [landmarkPresent]})
+                if enumerate.name not in enumsFilter:
+                    landmarkX = -999
+                    landmarkY = -999
+                    landmarkZ = -999
+                    landmarkPresent = 0
+                    
+                    key = landmarkTypeName + "_" + enumerate.name + '_x'
+                    data.update({key: data[key] + [landmarkX]})
+                    key = landmarkTypeName + "_" + enumerate.name + '_y'
+                    data.update({key: data[key] + [landmarkY]})
+                    key = landmarkTypeName + "_" + enumerate.name + '_z'
+                    data.update({key: data[key] + [landmarkZ]})
+                    key = landmarkTypeName + "_" + enumerate.name + '_present'
+                    data.update({key: data[key] + [landmarkPresent]})
                                         
     return data
 
@@ -437,7 +458,7 @@ def processVideoFile(videoPath:str, showVideo:bool=False, controllable=False) ->
     cv2.destroyAllWindows()
     return data
 
-
+# %%
 def filterDF(df:pd.DataFrame, filterCSVPath)->pd.DataFrame:
     filterDF = pd.read_csv(filterCSVPath)
     filterList = filterDF['words'].tolist()
@@ -456,18 +477,17 @@ def old_makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filt
     df = pd.read_csv(glossCSVPath)
     #df = df.head() #using only head as a proof of concept
     df = df[['Video file','Gloss']] #we only need file name and label
+        
     if filterCSVPath is not None:
         df = filterDF(df, filterCSVPath)
 
     tmp = df.apply(lambda row: processVideoFile(videoFolderPath + row['Video file']), axis=1, result_type='expand')#result_type='expand' unrolls the dictionaries from processVideoFile into a list of data frames, which allows us to join them later so we don't just get one big column, we get several columns
-    # maybe possibly making this add the process of the gpu accerlation with the test3.py if we can then incorporate the csv selectors with this script
-   
     df = df.join(tmp,how='left') # we need to join the sign names with their respective data
 
     df.to_csv(outputCSVFilePath)
 
 # %%
-def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None, chunkSize = 10, startIndex=0):
+def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCSVPath=None, chunkSize = 10, startIndex=0, stopIndex:int|None=None):
     df = pd.read_csv(glossCSVPath)
     #df = df.head() #using only head as a proof of concept
     df = df[['Video file','Gloss']] #we only need file name and label
@@ -477,7 +497,13 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
 
     numRows = len(df)
     
-    for i in range(startIndex, numRows, chunkSize):
+    if stopIndex is None:
+        stopIndex = numRows
+    stopIndex+=1
+    for i in range(startIndex, stopIndex, chunkSize):
+        if i+chunkSize > stopIndex:
+            chunkSize = stopIndex - i
+        
         dfChunk = df[i:i+chunkSize].copy(deep=True)#using a deep copy so we don't write to main df and cause exsesive use of memory
         
         # The following block of old code takes up to much memory during code execution
@@ -499,6 +525,6 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
 
 # %%
 # makePreProcessedData('archive/ASL_Citizen/splits/train.csv','archive/ASL_Citizen/videos/',
-#                   'processedData/output.csv', 'Key_ASL.csv', chunkSize=5, startIndex=55)
+#                   'processedData/output.csv', 'Key_ASL.csv', chunkSize=10, startIndex=100)
 
 

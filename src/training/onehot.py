@@ -1,6 +1,6 @@
 import pandas as pd
 from sklearn.preprocessing import OneHotEncoder
-df = pd.read_csv("../data/Finished_Output.csv")
+df = pd.read_csv("../data/small_val.csv")
 
 ohe = OneHotEncoder(handle_unknown='ignore', sparse_output= False)
 ohetransform = ohe.fit_transform(df[["Gloss"]]) #remove head later this is just for testing!
@@ -8,4 +8,4 @@ feature_names = [name.replace('Gloss_', '') for name in ohe.get_feature_names_ou
 encoded_df = pd.DataFrame(ohetransform, columns=feature_names)
 df = df[["Video file"]].join(encoded_df)
 
-df.to_csv('onehot.csv')
+df.to_csv('small_val_encoding.csv')
