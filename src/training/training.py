@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[2]:
+# In[ ]:
 
 
 import torch
@@ -11,7 +11,11 @@ import torch.nn.functional as F
 from torch.optim import Adam
 from torch.utils.data import Dataset, DataLoader
 
+import torchmetrics
+from torchmetrics import Metric
+
 import lightning as L
+from pytorch_lightning.loggers import TensorBoardLogger
 
 import pandas as pd
 
@@ -22,7 +26,7 @@ import ast
 
 # # postitional encoding
 
-# In[3]:
+# In[ ]:
 
 
 class PositionEncoding(nn.Module):
@@ -95,7 +99,6 @@ class PositionEncoding(nn.Module):
         
         # #this joins the pre computed stuff with the models, so if the model is on the gpu so is this stuff
         self.register_buffer('pe', pe)
-        # # NOTE the above line is causing problems
         
     def forward(self, embeddings):
         """
@@ -111,7 +114,7 @@ class PositionEncoding(nn.Module):
 
 # # Attention
 
-# In[4]:
+# In[ ]:
 
 
 class Attention(nn.Module): 
@@ -160,7 +163,7 @@ class Attention(nn.Module):
         # transpose is making sure to transpose the rows and cols while leaving the batch dim the same
         # attention score calculates similarity(aka sims) using dot product via matrix multiplication 
         sims = torch.matmul(q, k.transpose(dim0=self.row_dim, dim1=self.col_dim))
-        scaled_sims = sims / torch.tensor(self.d_model**0.5, device=sims.device)
+        scaled_sims = sims / torch.tensor(self.d_model**0.5)
 
         ##(q * k^T)/sqrt(d_model)+M
         if mask is not None:
@@ -179,7 +182,7 @@ class Attention(nn.Module):
 
 # # FeedForwardNeuralNetwork
 
-# In[5]:
+# In[ ]:
 
 
 class FeedForwardNetwork(nn.Module):
@@ -203,7 +206,7 @@ class FeedForwardNetwork(nn.Module):
 
 # # Encoder
 
-# In[6]:
+# In[ ]:
 
 
 class Encoder(L.LightningModule):
@@ -255,7 +258,7 @@ class Encoder(L.LightningModule):
                                            batch_first=batch_first, bias=bias, device=device)
         
         #normLayer
-        self.normL_MHA = nn.LayerNorm(embed_dim, eps=0.00001, bias=True, elementwise_affine=True, device=device)
+        self.normL_MHA = nn.LayerNorm(embed_dim, eps=0.0001, bias=True, elementwise_affine=True, device=device)
         
         ##############
         # feed forward Network
@@ -264,14 +267,14 @@ class Encoder(L.LightningModule):
         self.FFN = FeedForwardNetwork(in_size=embed_dim, hidden_size=hidden_size, out_size=embed_dim, device=device)
         
         #normLayer
-        self.normL_FFN = nn.LayerNorm(embed_dim, eps=0.00001, bias=True, elementwise_affine=True, device=device)
+        self.normL_FFN = nn.LayerNorm(embed_dim, eps=0.0001, bias=True, elementwise_affine=True, device=device)
         
         ###############
         # output layer
         ###############
         
         self.outputLayer = nn.Sequential(
-            nn.Linear(in_features=embed_dim, out_features=output_features, bias=bias, device=device),
+            nn.Linear(in_features=embed_dim * max_tokens, out_features=output_features, bias=bias, device=device),
             nn.Softmax(dim=-1)
         )
         
@@ -280,6 +283,15 @@ class Encoder(L.LightningModule):
         ###############
         
         self.loss = nn.CrossEntropyLoss()
+        
+        ###############
+        # metrics
+        ###############
+        
+        self.accuracy = torchmetrics.Accuracy(task='multiclass', num_classes=output_features)
+        self.recall = torchmetrics.Recall(task='multiclass', num_classes=output_features)
+        self.precision = torchmetrics.Precision(task='multiclass', num_classes=output_features)
+        self.f1 = torchmetrics.F1Score(task='multiclass', num_classes=output_features)
         
     def forward(self,x,attn_mask=None,):
         """
@@ -290,7 +302,7 @@ class Encoder(L.LightningModule):
         """
         embeddings = self.input_embeder(x)
         pos_encodings = self.pos_encoder(embeddings)
-        residual = embeddings + pos_encodings
+        residual:torch.Tensor = embeddings + pos_encodings
         
         attention_output, attention_weights = self.MHA.forward(residual, residual, residual, attn_mask=attn_mask,
                          average_attn_weights=False, need_weights=False)
@@ -298,6 +310,8 @@ class Encoder(L.LightningModule):
         
         ffn_output = self.FFN(residual)
         residual = self.normL_FFN(ffn_output+residual)
+        
+        residual = residual.flatten(1,2)
         
         output = self.outputLayer(residual)
         
@@ -314,10 +328,40 @@ class Encoder(L.LightningModule):
     
     def training_step(self, batch, batch_idx):
         input_tokens, labels = batch
+        output:torch.Tensor = self.forward(input_tokens)
+        loss = self.loss(output, labels)
+                
+        self.log_dict({'train_loss': loss, 'train_accuracy':self.accuracy(output, labels), 'train_recall':self.recall(output, labels),
+                       'train_precision':self.precision(output, labels), 'train_f1':self.f1(output, labels)},
+                      on_step=True,
+                      on_epoch=True
+                      )
+                    
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        input_tokens, labels = batch
         output = self.forward(input_tokens)
         loss = self.loss(output, labels)
-        
-        print(f'batch#:{batch_idx}, batch average loss:{torch.mean(loss)}')
+                
+        self.log_dict({'val_loss': loss, 'val_accuracy':self.accuracy(output, labels), 'val_recall':self.recall(output, labels),
+                       'val_precision':self.precision(output, labels), 'val_f1':self.f1(output, labels)},
+                      on_step=False,
+                      on_epoch=True
+                      )
+                    
+        return loss
+    
+    def test_step(self, batch, batch_idx):
+        input_tokens, labels = batch
+        output = self.forward(input_tokens)
+        loss = self.loss(output, labels)
+                
+        self.log_dict({'test_loss': loss, 'test_accuracy':self.accuracy(output, labels), 'test_recall':self.recall(output, labels),
+                       'test_precision':self.precision(output, labels), 'test_f1':self.f1(output, labels)},
+                      on_step=False,
+                      on_epoch=True
+                      )
                     
         return loss
 
@@ -335,7 +379,7 @@ class ASLDataset(Dataset):
         self.landmarkFile = landmarkFile
         self.oheFile = oheFile
         self.len = len
-        self.device=device
+        self.device = device
         
         #This is trying to implement a sort of cache using pandas, that way
         # we don't have to read from disc 
@@ -377,7 +421,7 @@ class ASLDataset(Dataset):
         y = y.values.tolist()#turn into list
         
         X = torch.tensor(X, dtype=torch.float32, device=self.device)
-        y = torch.tensor(y, dtype=torch.long, device=self.device)
+        y = torch.tensor(y, dtype=torch.float32, device=self.device)
         
         X = X.permute(1,0) #dimensions are flipped 
         
@@ -386,7 +430,7 @@ class ASLDataset(Dataset):
 
 # # Running Training code
 
-# In[14]:
+# In[ ]:
 
 
 longest_num_of_frames = 266
@@ -415,18 +459,20 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
                 hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
-                bias=False, device=device)
+                bias=False, device=None)
 
 
-landmarkFile = "..\\data\\small_padd_training.csv"
-oheFile = "..\\data\\small_training_encoding.csv"
+landmarkFile = "../data/small_padd_training.csv"
+oheFile = "../data/small_training_encoding.csv"
 numSamples = 20
 pandasCacheSize = 10
-dataset = ASLDataset(landmarkFile, oheFile, numSamples, pandasCacheSize, device=device)
+dataset = ASLDataset(landmarkFile, oheFile,numSamples,pandasCacheSize, device=device)
 
 batchSize = 5
-dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=False)
+dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=True)
 
-trainer = L.Trainer(max_epochs=1, accelerator="gpu", devices=1)
+logger = TensorBoardLogger('tb_log', 'model_V0')
+
+trainer = L.Trainer(logger=logger,max_epochs=100, accelerator='cpu', devices=1)
 trainer.fit(model, dataLoader)
 
