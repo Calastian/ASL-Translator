@@ -22,7 +22,7 @@ for i, gloss in enumerate(df['Gloss']):
 encoded_df = pd.DataFrame(one_hot_matrix, columns=all_words)
 result_df = df[["Video file"]].join(encoded_df)
 
-result_df.to_csv('../data/small_val_encoding.csv', index=False)
+result_df.to_csv('../data/small_val_encoding.csv', index=True)
 print(f"One-hot encoded data saved to training_encoding.csv")
 print(f"Shape: {result_df.shape}")
 print(f"Sample of encoded data:")
