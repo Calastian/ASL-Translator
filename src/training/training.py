@@ -23,6 +23,8 @@ import numpy as np
 
 import ast
 
+from lightning.pytorch.callbacks import ModelCheckpoint
+
 
 # # postitional encoding
 
@@ -428,6 +430,8 @@ class ASLDataset(Dataset):
         return X, y
 
 
+
+
 # # Running Training code
 
 # In[ ]:
@@ -473,6 +477,15 @@ dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=True)
 
 logger = TensorBoardLogger('tb_log', 'model_V0')
 
-trainer = L.Trainer(logger=logger,max_epochs=100, accelerator='cpu', devices=1)
+checkpoint_callback1 = ModelCheckpoint(
+    dirpath="../models",
+    filename="ASL_Model_{}",
+    save_top_k =5,
+    monitor="val_loss",
+    mode="min"
+)
+
+
+trainer = L.Trainer(logger=logger,max_epochs=100, accelerator='cpu', devices=1, callbacks=[checkpoint_callback])
 trainer.fit(model, dataLoader)
 
