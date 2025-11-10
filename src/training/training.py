@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
+# In[2]:
 
 
 import torch
@@ -15,18 +15,21 @@ import lightning as L
 
 import pandas as pd
 
+import numpy as np
 
+import ast
 
 
 # # postitional encoding
 
-# In[ ]:
+# In[3]:
 
 
 class PositionEncoding(nn.Module):
     """
     This code is the PositionEncoding part of stat quests transformer decoder video
     https://www.youtube.com/watch?v=C9QSpl5nmrY&list=PLblh5JKOoLUIxGDQs4LFFD--41Vzf-ME1 
+    With adjustments and corrections for our model
     
     We replaced the comments he had with my own though so we could understand whats going on better.
     We would've like to use a built in module for the positional encoding part of the transformer were
@@ -43,7 +46,7 @@ class PositionEncoding(nn.Module):
     
     So this class when initialized save all of the calculation then when you call forward it just does a lookup
     """
-    def __init__(self, d_model=112, max_len=242): #d_model=num_embeddings=(numFeatures-4)/4 + 4, max_len = max_numFrame * 2
+    def __init__(self, d_model, max_len):
         """
         d_model should be the same as the number of embeddings.
         max_len should be the max number of tokens processed at a time
@@ -52,6 +55,12 @@ class PositionEncoding(nn.Module):
         
         self.d_model=d_model
         
+        isOdd = False
+        #d_model needs to be even so self.pe[:, 1::2] works later 
+        if d_model % 2 != 0:
+            isOdd = True
+            d_model += 1
+                
         #initializing lookup table
         pe = torch.zeros(max_len, d_model)
         
@@ -80,8 +89,13 @@ class PositionEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term) 
         
-        #this joins the pre computed stuff with the models, so if the model is on the gpu so is this stuff
+        if isOdd: # we need to get rid of the extra computation at the end of the list so the dimension matches and we can perform tensor addition
+            pe = pe[:, 0:-1]
+        pass
+        
+        # #this joins the pre computed stuff with the models, so if the model is on the gpu so is this stuff
         self.register_buffer('pe', pe)
+        # # NOTE the above line is causing problems
         
     def forward(self, embeddings):
         """
@@ -89,15 +103,15 @@ class PositionEncoding(nn.Module):
         
         this method just looks up the precalculated positional encodings
         """
-        
-        return embeddings + self.pe[:self.d_model, :]                                                                       ## 
+        return embeddings + self.pe[:, :self.d_model] # this needed to be flipped for oue model
+                                                                                
         
         
 
 
 # # Attention
 
-# In[ ]:
+# In[4]:
 
 
 class Attention(nn.Module): 
@@ -108,7 +122,7 @@ class Attention(nn.Module):
     we figured out the pytorch already has an attention module that works and is optimized
     """
     
-    def __init__(self, d_model=112): #d_model=num_pos_encodings=num_embeddings=(numFeatures-4)/4 + 4
+    def __init__(self, d_model): #d_model=num_pos_encodings=num_embeddings=(numFeatures-4)/4 + 4
         """
         This method just creates the paramaters for the query, key, and value
         """
@@ -146,7 +160,7 @@ class Attention(nn.Module):
         # transpose is making sure to transpose the rows and cols while leaving the batch dim the same
         # attention score calculates similarity(aka sims) using dot product via matrix multiplication 
         sims = torch.matmul(q, k.transpose(dim0=self.row_dim, dim1=self.col_dim))
-        scaled_sims = sims / torch.tensor(self.d_model**0.5)
+        scaled_sims = sims / torch.tensor(self.d_model**0.5, device=sims.device)
 
         ##(q * k^T)/sqrt(d_model)+M
         if mask is not None:
@@ -161,6 +175,12 @@ class Attention(nn.Module):
         attention_scores = torch.matmul(attention_percents, v)
         
         return attention_scores
+
+
+# # FeedForwardNeuralNetwork
+
+# In[5]:
+
 
 class FeedForwardNetwork(nn.Module):
     def __init__(self, in_size:int, out_size:int, hidden_size:int|None=None, device=None):
@@ -181,10 +201,14 @@ class FeedForwardNetwork(nn.Module):
     
 
 
+# # Encoder
+
+# In[6]:
+
 
 class Encoder(L.LightningModule):
     
-    def __init__(self,input_features:int=436, output_features:int=172,embed_dim:int=112, max_tokens:int=664*2,
+    def __init__(self,input_features:int, output_features:int,max_tokens:int, embed_dim:int|None=None, 
                  hidden_size:int|None=None, num_heads:int=1, batch_first:bool=True, dropOut:float=0., bias:bool=False,
                  device=None):
         """
@@ -196,6 +220,9 @@ class Encoder(L.LightningModule):
         If hidden_size remains None then there will be no FFN.
         """
         super().__init__()
+        
+        if embed_dim is None:
+            embed_dim = input_features
         
         ##############
         #using embedding to convolute input
@@ -228,7 +255,7 @@ class Encoder(L.LightningModule):
                                            batch_first=batch_first, bias=bias, device=device)
         
         #normLayer
-        self.normL_MHA = nn.LayerNorm(embed_dim//num_heads, eps=0.00001, bias=True, elementwise_affine=True, device=device)
+        self.normL_MHA = nn.LayerNorm(embed_dim, eps=0.00001, bias=True, elementwise_affine=True, device=device)
         
         ##############
         # feed forward Network
@@ -272,7 +299,7 @@ class Encoder(L.LightningModule):
         ffn_output = self.FFN(residual)
         residual = self.normL_FFN(ffn_output+residual)
         
-        output = self.outputLayer(x)
+        output = self.outputLayer(residual)
         
         return output
     
@@ -295,6 +322,8 @@ class Encoder(L.LightningModule):
         return loss
 
 
+# # dataSet for data loader
+
 # In[ ]:
 
 
@@ -302,15 +331,27 @@ class ASLDataset(Dataset):
     """
     This class helps us lazily load the data so memory doesn't blow up
     """
-    def __init__(self, landmarkFile, oheFile, len, pdCacheSize):
+    def __init__(self, landmarkFile, oheFile, len, pdCacheSize, device):
         self.landmarkFile = landmarkFile
         self.oheFile = oheFile
         self.len = len
+        self.device=device
         
         #This is trying to implement a sort of cache using pandas, that way
         # we don't have to read from disc 
         self.pdCache:dict[str, pd.DataFrame] = {'landmarkDF':pd.DataFrame(), 'oheDF':pd.DataFrame()}
         self.pdCacheSize= pdCacheSize
+        
+        self.colsToDrop:dict = {'landmarkDF':['Video file', 'Gloss'], 'oheDF':['Video file']}
+        
+        def getConverters(path:str, columnsToDrop:list[str]=[])->dict:
+            df_columns = pd.read_csv(path, nrows=0).columns.to_list() #get columns
+            for col in columnsToDrop:
+                df_columns.remove(col)
+            return {col : ast.literal_eval for col in df_columns}
+        
+        self.pdConverters:dict[str, dict] = {'landmarkDF': getConverters(self.landmarkFile, self.colsToDrop['landmarkDF']),
+                                             'oheDF': getConverters(self.oheFile, self.colsToDrop['oheDF'])}
         
     def __len__(self):
         return self.len
@@ -318,56 +359,74 @@ class ASLDataset(Dataset):
     def __getitem__(self, index):
         # if index is not in cache load a new block of cache starting with index
         if index not in self.pdCache['landmarkDF'].index:
-            self.pdCache['landmarkDF'] = pd.read_csv(self.landmarkFile, skiprows=range(1,index+1), nrows=self.pdCacheSize)
-            self.pdCache['oheDF'] = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=self.pdCacheSize)
+            self.pdCache['landmarkDF'] = pd.read_csv(self.landmarkFile, 
+                                                     skiprows=range(1,index+1),
+                                                     nrows=self.pdCacheSize,
+                                                     converters=self.pdConverters['landmarkDF'],
+                                                     index_col=0)
+                                                        # skiprows=range(1,index+1) because the first line of the csv is the header line
+                                                        # nrows we read should be the size of the cache
+                                                        # converters come from intialization of the data frame and are used to correctly convert the csv string into their right data types
+                                                        # index_col=0 tells read_csv that we want the 0th column to be the index column this prevents pandas from making its own index starting from 0 again
+            self.pdCache['oheDF'] = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=self.pdCacheSize, converters=self.pdConverters['oheDF'], index_col=0)
             
-        X = torch.from_numpy(self.pdCache['landmarkDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float32'))
-        y = torch.from_numpy(self.pdCache['oheDF'].drop(columns=['Video file', 'Gloss']).to_numpy(dtype='float32'))
+        X = self.pdCache['landmarkDF'].drop(columns=self.colsToDrop['landmarkDF']).loc[index] 
+        y = self.pdCache['oheDF'].drop(columns=self.colsToDrop['oheDF']).loc[index]
+        
+        X = X.values.tolist()#turn into list 
+        y = y.values.tolist()#turn into list
+        
+        X = torch.tensor(X, dtype=torch.float32, device=self.device)
+        y = torch.tensor(y, dtype=torch.long, device=self.device)
+        
+        X = X.permute(1,0) #dimensions are flipped 
         
         return X, y
 
 
 # # Running Training code
 
-# In[ ]:
+# In[14]:
 
 
-longest_num_of_frames = 226
+longest_num_of_frames = 266
 """
 Pose landmarks: 33 landmarks × (x,y,z,present) = 132 columns
+Included pose landmarks: 23 landmarks - 10 landmarks = 23 landmarks x (x,y,z,present) = 92 columns
 Pose world landmarks: 33 landmarks × (x,y,z,present) = 132 columns
-Left hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
-Right hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
+Included pose world landmarks: 23 landmarks - 10 landmarks = 23 landmarks x (x,y,z,present) = 92 columns
+Included Left hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
+Included Right hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
 Overall presence indicators: 4 columns (poseLandmarks_present, poseWorldLandmarks_present, leftHandLandmarks_present, rightHandLandmarks_present)
-Other columns: idx, Video file, Gloss
-Total: 1+ 1 + 1 + 132 + 132 + 84 + 84 + 4 = 439 columns
-Total input = 439 - 3 = 436 input columns
-436 actual feature columns cause index, video file, label
-((TotalInput - OverallPresenceIndicators)/4) + OverallPresenceIndicators = ((436-4)/4) + 4 = 112 embeddings
+excluded columns: idx, Video file, Gloss
+included columns: padding
+Total: 92 + 92 + 84 + 84 + 4 + 1 + 1 + 1 + 1 = 360 columns
+Total input = 360 - 3 = 357 input columns
+357 actual feature columns cause index, video file, label
+((TotalInput - OverallPresenceIndicators)/5) + OverallPresenceIndicators = ((357-5)/4) + 5 = 93 embeddings
 """
-n_embedings = 112 # divisible by 1, 2, 4, 7, 8, 14, 16, 28, 56, and 112
+n_embedings = 93 # divisible by 1, 3, 31, 93
 hiddenSize = n_embedings * 2
-numberOfHeads = 4 # 112 % 4 == 0 is true
+numberOfHeads = 3 # 93 % 3 == 0 is true
 dropOutPercent = .1
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 
-model = Encoder(input_features=436, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames*2,
+model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
                 hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
                 bias=False, device=device)
 
 
-landmarkFile = '../data/Finished_Output.csv'
-oheFile = '../data/onehot.csv'
+landmarkFile = "..\\data\\small_padd_training.csv"
+oheFile = "..\\data\\small_training_encoding.csv"
 numSamples = 20
 pandasCacheSize = 10
-dataset = ASLDataset(landmarkFile, oheFile,numSamples,pandasCacheSize)
+dataset = ASLDataset(landmarkFile, oheFile, numSamples, pandasCacheSize, device=device)
 
 batchSize = 5
-shuffle = True
-dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=shuffle)
+dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=False)
 
-trainer = L.Trainer(max_epochs=5)
+trainer = L.Trainer(max_epochs=1, accelerator="gpu", devices=1)
 trainer.fit(model, dataLoader)
 
