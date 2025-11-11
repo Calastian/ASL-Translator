@@ -326,7 +326,7 @@ class Encoder(L.LightningModule):
         like stochastic gradient decent except instead of using a fixed learning rate for all params
         it uses an adapted learning for each param
         """
-        return Adam(self.parameters(), lr=0.0001)
+        return Adam(self.parameters(), lr=0.01)
     
     def training_step(self, batch, batch_idx):
         input_tokens, labels = batch
@@ -377,17 +377,21 @@ class ASLDataset(Dataset):
     """
     This class helps us lazily load the data so memory doesn't blow up
     """
-    def __init__(self, landmarkFile, oheFile, len, pdCacheSize, device):
+    def __init__(self, landmarkFile, oheFile, len, pdCacheSize: int | None = None, device = None):
         self.landmarkFile = landmarkFile
         self.oheFile = oheFile
         self.len = len
         self.device = device
+        self.pdCacheSize = pdCacheSize
         
-        #This is trying to implement a sort of cache using pandas, that way
-        # we don't have to read from disc 
-        self.pdCache:dict[str, pd.DataFrame] = {'landmarkDF':pd.DataFrame(), 'oheDF':pd.DataFrame()}
-        self.pdCacheSize= pdCacheSize
         
+        if pdCacheSize is not None:
+            #This is trying to implement a sort of cache using pandas, that way
+            # we don't have to read from disc 
+            self.pdCache:dict[str, pd.DataFrame] = {'landmarkDF':pd.DataFrame(), 'oheDF':pd.DataFrame()}
+        else:
+            self.pdCache = None
+            
         self.colsToDrop:dict = {'landmarkDF':['Video file', 'Gloss'], 'oheDF':['Video file']}
         
         def getConverters(path:str, columnsToDrop:list[str]=[])->dict:
@@ -403,89 +407,170 @@ class ASLDataset(Dataset):
         return self.len
     
     def __getitem__(self, index):
-        # if index is not in cache load a new block of cache starting with index
-        if index not in self.pdCache['landmarkDF'].index:
-            self.pdCache['landmarkDF'] = pd.read_csv(self.landmarkFile, 
-                                                     skiprows=range(1,index+1),
-                                                     nrows=self.pdCacheSize,
-                                                     converters=self.pdConverters['landmarkDF'],
-                                                     index_col=0)
-                                                        # skiprows=range(1,index+1) because the first line of the csv is the header line
-                                                        # nrows we read should be the size of the cache
-                                                        # converters come from intialization of the data frame and are used to correctly convert the csv string into their right data types
-                                                        # index_col=0 tells read_csv that we want the 0th column to be the index column this prevents pandas from making its own index starting from 0 again
-            self.pdCache['oheDF'] = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=self.pdCacheSize, converters=self.pdConverters['oheDF'], index_col=0)
+        if self.pdCacheSize is not None:
             
-        X = self.pdCache['landmarkDF'].drop(columns=self.colsToDrop['landmarkDF']).loc[index] 
-        y = self.pdCache['oheDF'].drop(columns=self.colsToDrop['oheDF']).loc[index]
-        
+            # if index is not in cache load a new block of cache starting with index
+            if index not in self.pdCache['landmarkDF'].index:
+                self.pdCache['landmarkDF'] = pd.read_csv(self.landmarkFile, 
+                                                         skiprows=range(1,index+1),
+                                                         nrows=self.pdCacheSize,
+                                                         converters=self.pdConverters['landmarkDF'],
+                                                         index_col=0)
+                                                            # skiprows=range(1,index+1) because the first line of the csv is the header line
+                                                            # nrows we read should be the size of the cache
+                                                            # converters come from intialization of the data frame and are used to correctly convert the csv string into their right data types
+                                                            # index_col=0 tells read_csv that we want the 0th column to be the index column this prevents pandas from making its own index starting from 0 again
+                self.pdCache['oheDF'] = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=self.pdCacheSize, converters=self.pdConverters['oheDF'], index_col=0)
+
+            X = self.pdCache['landmarkDF'].drop(columns=self.colsToDrop['landmarkDF']).loc[index] 
+            y = self.pdCache['oheDF'].drop(columns=self.colsToDrop['oheDF']).loc[index]
+        else:
+            X = pd.read_csv(self.landmarkFile, skiprows=range(1,index+1), nrows=1, converters=self.pdConverters['landmarkDF'], index_col=0)
+            y = pd.read_csv(self.oheFile, skiprows=range(1,index+1), nrows=1, converters=self.pdConverters['oheDF'], index_col=0)
+
+            X = X.drop(columns=self.colsToDrop['landmarkDF']).loc[index] 
+            y = y.drop(columns=self.colsToDrop['oheDF']).loc[index]
+         
         X = X.values.tolist()#turn into list 
         y = y.values.tolist()#turn into list
         
         X = torch.tensor(X, dtype=torch.float32, device=self.device)
         y = torch.tensor(y, dtype=torch.float32, device=self.device)
+        y = torch.argmax(y).long()
         
         X = X.permute(1,0) #dimensions are flipped 
         
         return X, y
 
 
+class PreloadedASLDataset(Dataset):
+    def __init__(self, landmarkFile, oheFile, length, device=None):
+        self.landmarkFile = landmarkFile
+        self.oheFile = oheFile
+        self.length = length
+        
+        #From ASLDataset class ^^ Stays the same for every dataset..
+        self.colsToDrop:dict = {'landmarkDF':['Video file', 'Gloss'], 'oheDF':['Video file']}
+        
+        def getConverters(path:str, columnsToDrop:list[str]=[])->dict:
+            df_columns = pd.read_csv(path, nrows=0).columns.to_list() #get columns
+            for col in columnsToDrop:
+                df_columns.remove(col)
+            return {col : ast.literal_eval for col in df_columns}
+        
+        self.pdConverters:dict[str, dict] = {'landmarkDF': getConverters(self.landmarkFile, self.colsToDrop['landmarkDF']),
+                                             'oheDF': getConverters(self.oheFile, self.colsToDrop['oheDF'])}
+        #END
+        
+        print("Loading entire dataset into memory...")
+        
+        # Load all data once
+        landmark_df = pd.read_csv(self.landmarkFile, converters=self.pdConverters['landmarkDF'], nrows=length, index_col=0)
+        ohe_df = pd.read_csv(self.oheFile, converters=self.pdConverters['oheDF'], nrows=length, index_col=0)
 
+        # Convert to tensors once
+        self.features = []
+        self.labels = []
+            
+        for index in landmark_df.index:  # Use actual index instead of range
+            # Process and convert to tensors (same as ASLDataset)
+            X = landmark_df.drop(columns=self.colsToDrop['landmarkDF']).loc[index] 
+            y = ohe_df.drop(columns=self.colsToDrop['oheDF']).loc[index]
+            
+            # Convert to lists (same as ASLDataset)
+            X = X.values.tolist()
+            y = y.values.tolist()
+            
+            # Create tensors (same as ASLDataset)
+            X = torch.tensor(X, dtype=torch.float32, device=device)
+            y = torch.tensor(y, dtype=torch.float32, device=device)
+            # y = torch.argmax(y).long()  # Convert one-hot to class index
+            
+            X = X.permute(1,0)  # Flip dimensions (same as ASLDataset)
+            
+            self.features.append(X)
+            self.labels.append(y)
+            
+            if len(self.features) % 100 == 0:
+                print(f"Loaded {len(self.features)}/{len(landmark_df)} samples")
+        
+    def __len__(self):
+        return self.length
+               
+    def __getitem__(self, idx):
+        return self.features[idx], self.labels[idx]  # Already on GPU!
 
 # # Running Training code
 
 # In[ ]:
 
-
-longest_num_of_frames = 266
-"""
-Pose landmarks: 33 landmarks × (x,y,z,present) = 132 columns
-Included pose landmarks: 23 landmarks - 10 landmarks = 23 landmarks x (x,y,z,present) = 92 columns
-Pose world landmarks: 33 landmarks × (x,y,z,present) = 132 columns
-Included pose world landmarks: 23 landmarks - 10 landmarks = 23 landmarks x (x,y,z,present) = 92 columns
-Included Left hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
-Included Right hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
-Overall presence indicators: 4 columns (poseLandmarks_present, poseWorldLandmarks_present, leftHandLandmarks_present, rightHandLandmarks_present)
-excluded columns: idx, Video file, Gloss
-included columns: padding
-Total: 92 + 92 + 84 + 84 + 4 + 1 + 1 + 1 + 1 = 360 columns
-Total input = 360 - 3 = 357 input columns
-357 actual feature columns cause index, video file, label
-((TotalInput - OverallPresenceIndicators)/5) + OverallPresenceIndicators = ((357-5)/4) + 5 = 93 embeddings
-"""
-n_embedings = 93 # divisible by 1, 3, 31, 93
-hiddenSize = n_embedings * 2
-numberOfHeads = 3 # 93 % 3 == 0 is true
-dropOutPercent = .1
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-
-
-model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
-                hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
-                bias=False, device=None)
-
-
-landmarkFile = "../data/small_padd_training.csv"
-oheFile = "../data/small_training_encoding.csv"
-numSamples = 20
-pandasCacheSize = 10
-dataset = ASLDataset(landmarkFile, oheFile,numSamples,pandasCacheSize, device=device)
-
-batchSize = 5
-dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=True)
-
-logger = TensorBoardLogger('tb_log', 'model_V0')
-
-checkpoint_callback1 = ModelCheckpoint(
-    dirpath="../models",
-    filename="ASL_Model_{}",
-    save_top_k =5,
-    monitor="val_loss",
-    mode="min"
-)
-
-
-trainer = L.Trainer(logger=logger,max_epochs=100, accelerator='cpu', devices=1, callbacks=[checkpoint_callback])
-trainer.fit(model, dataLoader)
-
+if __name__ == "__main__":
+    
+    """
+    Pose landmarks: 33 landmarks × (x,y,z,present) = 132 columns
+    Included pose landmarks: 23 landmarks - 10 landmarks = 23 landmarks x (x,y,z,present) = 92 columns
+    Pose world landmarks: 33 landmarks × (x,y,z,present) = 132 columns
+    Included pose world landmarks: 23 landmarks - 10 landmarks = 23 landmarks x (x,y,z,present) = 92 columns
+    Included Left hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
+    Included Right hand landmarks: 21 landmarks × (x,y,z,present) = 84 columns
+    Overall presence indicators: 4 columns (poseLandmarks_present, poseWorldLandmarks_present, leftHandLandmarks_present, rightHandLandmarks_present)
+    excluded columns: idx, Video file, Gloss
+    included columns: padding
+    Total: 92 + 92 + 84 + 84 + 4 + 1 + 1 + 1 + 1 = 360 columns
+    Total input = 360 - 3 = 357 input columns
+    357 actual feature columns cause index, video file, label
+    ((TotalInput - OverallPresenceIndicators)/5) + OverallPresenceIndicators = ((357-5)/4) + 5 = 93 embeddings
+    """
+    
+    longest_num_of_frames = 266
+    n_embedings = 93 # divisible by 1, 3, 31, 93
+    hiddenSize = n_embedings * 2
+    numberOfHeads = 3 # 93 % 3 == 0 is true
+    dropOutPercent = 0
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
+                    hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
+                    bias=False, device=device)
+    
+    landmarkFile = "../data/padd_training.csv"
+    oheFile = "../data/training_encoding.csv"
+    numSamples = 2444
+    # numSamples = 20
+    pandasCacheSize = 10
+    # dataset = ASLDataset(landmarkFile, oheFile, numSamples, pdCacheSize=pandasCacheSize, device=device)
+    dataset = PreloadedASLDataset(landmarkFile, oheFile, length=numSamples, device=device)
+    
+    batchSize = 128
+    # dataLoader = DataLoader(dataset=dataset, batch_size=batchSize,shuffle=True, num_workers=2, persistent_workers=True)
+    dataLoader = DataLoader(dataset=dataset, batch_size=batchSize, shuffle=True, num_workers=2, persistent_workers=True)
+    
+    val_landmarkFile = "../data/padd_val.csv" 
+    val_oheFile = "../data/val_encoding.csv"
+    val_samples = 624
+    # val_samples = 10
+    val_pandasCacheSize = 10
+    # val_dataset = ASLDataset(val_landmarkFile, val_oheFile, val_samples, pdCacheSize=val_pandasCacheSize, device=device)
+    val_dataset = PreloadedASLDataset(val_landmarkFile, val_oheFile, length=val_samples, device=device)
+    
+    # val_dataLoader = DataLoader(dataset=val_dataset, batch_size=batchSize,shuffle=False, num_workers=2, persistent_workers=True)
+    val_dataLoader = DataLoader(dataset=val_dataset, batch_size=batchSize, shuffle=False, num_workers=2, persistent_workers=True)
+    
+    logger = TensorBoardLogger('tb_log', 'model_V0')
+    overfitLogger = TensorBoardLogger('OverfitLogs', 'BatchOverFitModel')
+    
+    checkpoint_callback = ModelCheckpoint(
+        dirpath="../models/",
+        filename="ASL_Model_",
+        save_top_k =5,
+        monitor="val_loss",
+        mode="min"
+    )
+    
+    # overfitTrainer = L.Trainer(logger=overfitLogger,max_epochs=100, accelerator='gpu', devices=1, callbacks=[checkpoint_callback], overfit_batches=1)
+    # overfitTrainer.fit(model, dataLoader, val_dataLoader)
+    
+    trainer = L.Trainer(logger=logger, max_epochs=10000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
+    trainer.fit(model, dataLoader, val_dataLoader)
+    
+    
