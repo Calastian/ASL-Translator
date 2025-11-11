@@ -1,8 +1,8 @@
 import pandas as pd
 import ast
 
-input_csv = '../src/data/small_val.csv'
-output_csv = '../src/data/small_padd_val.csv'
+input_csv = '../data/training.csv'
+output_csv = '../data/padd_training.csv'
 target_length = 266
 reference_col = 'poseLandmarks_present'  # this to determine sequence length
 pad_values = -999

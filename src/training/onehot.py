@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv("../data/small_val.csv")
+df = pd.read_csv("../data/val.csv")
 key_df = pd.read_csv("../../docs/Key_ASL.csv")
 all_words = key_df['words'].tolist()
 print(f"Total words from key_asl.csv: {len(all_words)}")
@@ -22,7 +22,7 @@ for i, gloss in enumerate(df['Gloss']):
 encoded_df = pd.DataFrame(one_hot_matrix, columns=all_words)
 result_df = df[["Video file"]].join(encoded_df)
 
-result_df.to_csv('../data/small_val_encoding.csv', index=True)
+result_df.to_csv('../data/val_encoding.csv', index=True)
 print(f"One-hot encoded data saved to training_encoding.csv")
 print(f"Shape: {result_df.shape}")
 print(f"Sample of encoded data:")
