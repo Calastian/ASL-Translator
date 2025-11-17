@@ -572,5 +572,5 @@ if __name__ == "__main__":
     
     trainer = L.Trainer(logger=logger, max_epochs=10000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
     trainer.fit(model, dataLoader, val_dataLoader)
-    
+
     

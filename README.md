@@ -21,3 +21,36 @@ ASL-Translator is a machine learning-powered tool that translates American Sign 
 - **Open to contributions and feedback**
 
 ---
+
+
+## Quick Start
+
+1. **Unzip the folder.**
+2. **Windows:** Double-click `run_windows.bat`
+3. **Linux/Mac:** Open a terminal in the folder, and run:
+   ```
+   ./run_linux_mac.sh
+   ```
+
+The first launch will install requirements automatically.
+
+### System Requirements
+
+- Python 3.12.x (pre-installed on Mac/Linux; Windows users will be auto-handled)
+- 8GB+ RAM recommended
+- CUDA toolkit if you want GPU acceleration, or use CPU
+
+## Model File
+
+- The LLM model `ph-2.q4.gguf` is bundled in the `models/` directory.
+- The ASL_Model `ASL_MODEL_.ckpt` is bundled in the `models/` directory.
+
+## Custom Data
+
+- Place your video files in the appropriate folder (desktop/recordings).
+- Download Phi model URL: https://huggingface.co/TheBloke/phi-2-GGUF?show_file_info=phi-2.Q4_K_M.gguf
+
+## Troubleshooting
+
+- If you get missing DLL/C++ errors, install MSVC (Windows), or `build-essential` (Linux).
+- For environment issues, delete the `venv` folder and re-launch the script.

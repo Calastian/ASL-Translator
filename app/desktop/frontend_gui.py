@@ -4,6 +4,7 @@ import os
 import cv2 
 import threading 
 import datetime as date
+from llama_cpp import Llama
 
 
 
@@ -108,17 +109,38 @@ class GUI:
 
     def process_videos(self):
         results = []
+        input_list = []
         for fname in os.listdir(self.video_dir):
             if fname.endswith('.mp4') or fname.endswith('.avi'):
                 video_path = os.path.join(self.video_dir, fname)
-                res = self.run_model(video_path)  
+                res = self.run_model(video_path) 
                 results.append(f"{fname}: {res}")
                 self.result_text.insert(tk.END, f"{fname}: {res}\n")
+                self.result_text.see(tk.END)
+                self.result_text.update_idletasks()
+                input_list.append(res) ##creating a str list to pass to llm 
+        
+        # This is where we will call the llm to combine ouputs into sentence
+        llm_input = " ".join(input_list)
+        # MODEL_PATH = "../../src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
+        MODEL_PATH = "../../src/models/phi-2.Q4_K_M.gguf"
+        
+        llm = Llama(model_path=MODEL_PATH)
+        prompt = f"Make a correct and fluent English sentence using these words: {llm_input}"
+        # prompt = f"Make a correct and fluent English sentence using these words: I go School Yesterday"
+        response = llm(prompt, max_tokens=40, stop=["\n"])
+        llm_output = response["choices"][0]["text"].strip()
+        
+        self.result_text.insert(tk.END, "\nCombined/Corrected Sentence:\n")
+        self.result_text.insert(tk.END, f"{llm_output}")
         self.status_label.config(text="Done.")
+        
 
     def run_model(self, video_path):
         # this should call the class with the trained model and then return a str or something
         # Placeholder implementation to avoid indentation error; replace with real model invocation.
+        
+        
         return "Model not implemented"
 
 if __name__ == "__main__":
