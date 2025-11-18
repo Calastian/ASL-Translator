@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+"""
+ASL Translator Training Script
+
+IMPORTANT FIX APPLIED:
+- Removed nn.Softmax from output layer (line ~278)
+- CrossEntropyLoss already applies softmax internally
+- Having both caused "double softmax" which broke training and caused model collapse
+- Softmax is now only applied in predict() method for inference
+- ALL PREVIOUS CHECKPOINTS (v1-v9) ARE BROKEN - Must retrain from scratch!
+"""
+
 # # imports
 
 # In[3]:
@@ -275,10 +286,8 @@ class Encoder(L.LightningModule):
         # output layer
         ###############
         
-        # self.outputLayer = nn.Sequential(
-        #     nn.Linear(in_features=embed_dim * max_tokens, out_features=output_features, bias=bias, device=device),
-        # )
-        
+        # Fixed: Removed Softmax because CrossEntropyLoss applies it internally
+        # Having both causes double softmax which breaks training
         self.outputLayer = nn.Linear(
             in_features=embed_dim * max_tokens, 
             out_features=output_features, 
@@ -332,7 +341,7 @@ class Encoder(L.LightningModule):
         like stochastic gradient decent except instead of using a fixed learning rate for all params
         it uses an adapted learning for each param
         """
-        return Adam(self.parameters(), lr=0.01)
+        return Adam(self.parameters(), lr=0.0001)
     
     def training_step(self, batch, batch_idx):
         input_tokens, labels = batch
@@ -374,32 +383,45 @@ class Encoder(L.LightningModule):
         return loss
     
     def predict(self, X, device = None):
-        """
-        This is the function that takes in input from a model and makes it proper output for our application
-        """
         tmpDF:pd.DataFrame = pd.read_csv('../../docs/Key_ASL.csv')
-        key:list = tmpDF['words'].tolist()
+        key:list = tmpDF['words'].tolist()  
         
-        X = X.values.tolist()
+        if device is None:
+            device = next(self.parameters()).device
         
-        X = torch.tensor(X, dtype=torch.float32, device=device)
+        self.eval()  
+        self.to(device)
         
-        X = X.permute(0,2,1) #dimensions are flipped 
+        predictions_list = []
+        confidences_list = []
         
-        self.eval()#need to set to evaluation mode to disable dropout
-        with torch.no_grad(): # with no grad makes sure the the gradient isn't computed on each step
-            X = X.to(device)
-            predictions = self(X)
-            assert isinstance(predictions, torch.Tensor)
-            predictions = predictions.softmax(-1)
-            indexes = predictions.argmax(1)
-            predictedWords = [key[index] for index in indexes]
-            predictedConfidences = [pred[index] for index, pred in zip(indexes, predictions)]
+        with torch.no_grad(): 
             
-        return predictedWords, predictedConfidences
+            for idx in X.index:
+                
+                sample = X.loc[idx]
+                sample_tensor = torch.tensor(sample.values.tolist(), dtype=torch.float32, device=device)
+                
+                sample_tensor = sample_tensor.permute(1, 0)
+                
+                sample_tensor = sample_tensor.unsqueeze(0)
+                
+                output = self(sample_tensor)  
+                
+                probs = F.softmax(output, dim=1)
+                
+                confidence, pred_idx = torch.max(probs, dim=1)
+                
+                predicted_word = key[pred_idx.item()]
+                conf_value = confidence.item()
+                
+                predictions_list.append(predicted_word)
+                confidences_list.append(conf_value)
+                
+                print(f"Sample {idx}: {predicted_word} (confidence: {conf_value:.4f})")
+        
+        return predictions_list, confidences_list
 
-
-# # dataSet for data loader
 
 # In[ ]:
 
@@ -468,7 +490,7 @@ class ASLDataset(Dataset):
         
         X = torch.tensor(X, dtype=torch.float32, device=self.device)
         y = torch.tensor(y, dtype=torch.float32, device=self.device)
-        # y = torch.argmax(y).long()
+        y = torch.argmax(y).long()  # Convert one-hot to class index (REQUIRED for CrossEntropyLoss)
         
         X = X.permute(1,0) #dimensions are flipped 
         
@@ -516,7 +538,7 @@ class PreloadedASLDataset(Dataset):
             # Create tensors (same as ASLDataset)
             X = torch.tensor(X, dtype=torch.float32, device=device)
             y = torch.tensor(y, dtype=torch.float32, device=device)
-            # y = torch.argmax(y).long()  # Convert one-hot to class index
+            y = torch.argmax(y).long()  # Convert one-hot to class index (REQUIRED for CrossEntropyLoss)
             
             X = X.permute(1,0)  # Flip dimensions (same as ASLDataset)
             
@@ -568,7 +590,7 @@ if __name__ == "__main__":
     n_embedings = 93 # divisible by 1, 3, 31, 93
     hiddenSize = n_embedings * 2
     numberOfHeads = 3 # 93 % 3 == 0 is true
-    dropOutPercent = 0
+    dropOutPercent = 0.1
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
@@ -604,7 +626,7 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(
         dirpath="../models/",
         filename="ASL_Model_",
-        save_top_k =5,
+        save_top_k =20,
         monitor="val_loss",
         mode="min"
     )
@@ -612,33 +634,33 @@ if __name__ == "__main__":
     # overfitTrainer = L.Trainer(logger=overfitLogger,max_epochs=100, accelerator='gpu', devices=1, callbacks=[checkpoint_callback], overfit_batches=1)
     # overfitTrainer.fit(model, dataLoader, val_dataLoader)
     
-    trainer = L.Trainer(logger=logger, max_epochs=10000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
+    trainer = L.Trainer(logger=logger, max_epochs=50000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
     trainer.fit(model, dataLoader, val_dataLoader)
     
     
-    colsToDrop = ['Video file', 'Gloss']
-    inputPath = '../data/small_padd_training.csv'
-    x = pd.read_csv(inputPath, nrows=10, index_col=0, converters=getConverters(inputPath, columnsToDrop=colsToDrop))
-    x = x.drop(columns=colsToDrop)
-
-
-
-
-    longest_num_of_frames = 266
-    n_embedings = 93 # divisible by 1, 3, 31, 93
-    hiddenSize = n_embedings * 2
-    numberOfHeads = 3 # 93 % 3 == 0 is true
-    dropOutPercent = 0
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
-                    hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
-                    bias=False, device=device)
-    checkpoint = torch.load('../models/ASL_Model_-v1.ckpt', map_location=torch.device('cpu'))
-    model.load_state_dict(checkpoint['state_dict'])
-    # model = Encoder.load_from_checkpoint('../models/ASL_Model_-v9.ckpt',map_location=torch.device('cpu'), input_features=357 , output_features=172, max_tokens=266, embed_dim=93, hiddenSize=93*2, numberOfHeads=3)
-
-    model.predict(x, device)
+    # colsToDrop = ['Video file', 'Gloss']
+    # inputPath = '../data/small_padd_training.csv'
+    # x = pd.read_csv(inputPath, nrows=10, index_col=0, converters=getConverters(inputPath, columnsToDrop=colsToDrop))
+    # x = x.drop(columns=colsToDrop)
+    
+    
+    
+    
+    # longest_num_of_frames = 266
+    # n_embedings = 93 # divisible by 1, 3, 31, 93
+    # hiddenSize = n_embedings * 2
+    # numberOfHeads = 3 # 93 % 3 == 0 is true
+    # dropOutPercent = 0
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
+    #                 hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
+    #                 bias=False, device=device)
+    # checkpoint = torch.load('../models/ASL_Model_-v1.ckpt', map_location=torch.device('cpu'))
+    # model.load_state_dict(checkpoint['state_dict'])
+    # # model = Encoder.load_from_checkpoint('../models/ASL_Model_-v9.ckpt',map_location=torch.device('cpu'), input_features=357 , output_features=172, max_tokens=266, embed_dim=93, hiddenSize=93*2, numberOfHeads=3)
+    
+    # model.predict(x, device)
 
 # # testing inference function
 
