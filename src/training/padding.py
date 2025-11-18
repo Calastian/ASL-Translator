@@ -88,7 +88,6 @@ cols = (
 )
 df = df[cols]
 
-# Save the padded dataset
 df.to_csv(output_csv, index=False)
 
 print(f"\nDataset saved to {output_csv}")

@@ -335,13 +335,13 @@ class Encoder(L.LightningModule):
         return output
     
     def configure_optimizers(self):
-        pass
+        
         """
         (Ada)ptive (m)oment estimation, 
         like stochastic gradient decent except instead of using a fixed learning rate for all params
         it uses an adapted learning for each param
         """
-        return Adam(self.parameters(), lr=0.0001)
+        return Adam(self.parameters(), lr=0.001)
     
     def training_step(self, batch, batch_idx):
         input_tokens, labels = batch
@@ -383,44 +383,28 @@ class Encoder(L.LightningModule):
         return loss
     
     def predict(self, X, device = None):
+        """
+        This is the function that takes in input from a model and makes it proper output for our application
+        """
         tmpDF:pd.DataFrame = pd.read_csv('../../docs/Key_ASL.csv')
-        key:list = tmpDF['words'].tolist()  
+        key:list = tmpDF['words'].tolist()
         
-        if device is None:
-            device = next(self.parameters()).device
+        X = X.values.tolist()
         
-        self.eval()  
-        self.to(device)
+        X = torch.tensor(X, dtype=torch.float32, device=device)
         
-        predictions_list = []
-        confidences_list = []
+        X = X.permute(0,2,1) #dimensions are flipped 
         
-        with torch.no_grad(): 
+        self.eval()#need to set to evaluation mode to disable dropout
+        with torch.no_grad(): # with no grad makes sure the the gradient isn't computed on each step
+            X = X.to(device)
+            predictions = self(X)
+            assert isinstance(predictions, torch.Tensor)
+            indexes = predictions.argmax(1)
+            predictedWords = [key[index] for index in indexes]
+            predictedConfidences = [pred[index] for index, pred in zip(indexes, predictions)]
             
-            for idx in X.index:
-                
-                sample = X.loc[idx]
-                sample_tensor = torch.tensor(sample.values.tolist(), dtype=torch.float32, device=device)
-                
-                sample_tensor = sample_tensor.permute(1, 0)
-                
-                sample_tensor = sample_tensor.unsqueeze(0)
-                
-                output = self(sample_tensor)  
-                
-                probs = F.softmax(output, dim=1)
-                
-                confidence, pred_idx = torch.max(probs, dim=1)
-                
-                predicted_word = key[pred_idx.item()]
-                conf_value = confidence.item()
-                
-                predictions_list.append(predicted_word)
-                confidences_list.append(conf_value)
-                
-                print(f"Sample {idx}: {predicted_word} (confidence: {conf_value:.4f})")
-        
-        return predictions_list, confidences_list
+        return predictedWords, predictedConfidences
 
 
 # In[ ]:
