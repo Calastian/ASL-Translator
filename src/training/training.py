@@ -1,7 +1,7 @@
-#!/usr/bin/env python
-# coding: utf-8
+# %% [markdown]
+# # imports
 
-# In[ ]:
+# %%
 
 
 import torch
@@ -25,10 +25,10 @@ import ast
 
 from lightning.pytorch.callbacks import ModelCheckpoint
 
-
+# %% [markdown]
 # # postitional encoding
 
-# In[ ]:
+# %%
 
 
 class PositionEncoding(nn.Module):
@@ -109,14 +109,12 @@ class PositionEncoding(nn.Module):
         this method just looks up the precalculated positional encodings
         """
         return embeddings + self.pe[:, :self.d_model] # this needed to be flipped for oue model
-                                                                                
-        
-        
 
 
+# %% [markdown]
 # # Attention
 
-# In[ ]:
+# %%
 
 
 class Attention(nn.Module): 
@@ -181,10 +179,10 @@ class Attention(nn.Module):
         
         return attention_scores
 
-
+# %% [markdown]
 # # FeedForwardNeuralNetwork
 
-# In[ ]:
+# %%
 
 
 class FeedForwardNetwork(nn.Module):
@@ -203,14 +201,11 @@ class FeedForwardNetwork(nn.Module):
             )
     def forward(self, x):
         return self.model(x)
-    
 
+# %% [markdown]
+# # encoder model
 
-# # Encoder
-
-# In[ ]:
-
-
+# %%
 class Encoder(L.LightningModule):
     
     def __init__(self,input_features:int, output_features:int,max_tokens:int, embed_dim:int|None=None, 
@@ -226,8 +221,13 @@ class Encoder(L.LightningModule):
         """
         super().__init__()
         
+        self.save_hyperparameters()#this is used for saving hyperparameters during callbacks
+                
         if embed_dim is None:
             embed_dim = input_features
+            
+        if device is not None:
+            self._device = device
         
         ##############
         #using embedding to convolute input
@@ -275,10 +275,8 @@ class Encoder(L.LightningModule):
         # output layer
         ###############
         
-        self.outputLayer = nn.Sequential(
-            nn.Linear(in_features=embed_dim * max_tokens, out_features=output_features, bias=bias, device=device),
-            nn.Softmax(dim=-1)
-        )
+        self.outputLayer = nn.Linear(in_features=embed_dim * max_tokens, out_features=output_features, bias=bias, device=device)
+        #don't include softmax because the loss function CrossEntropy applies the softmax function already, and if we include it it's applied twice
         
         ###############
         # how is loss calculated
@@ -366,13 +364,37 @@ class Encoder(L.LightningModule):
                       )
                     
         return loss
+    
+    def predict(self, X):
+        """
+        This is the function that takes in input from a model and makes it proper output for our application
+        """
+        tmpDF:pd.DataFrame = pd.read_csv('../../docs/Key_ASL.csv')
+        key:list = tmpDF['words'].tolist()
+        
+        X = X.values.tolist()
+        
+        X = torch.tensor(X, dtype=torch.float32, device=self._device)
+        
+        X = X.permute(0,2,1) #dimensions are flipped 
+        
+        self.eval()#need to set to evaluation mode to disable dropout
+        with torch.no_grad(): # with no grad makes sure the the gradient isn't computed on each step
+            X = X.to(self._device)
+            predictions = self(X)
+            assert isinstance(predictions, torch.Tensor)
+            probs = predictions.softmax(-1)#we have to apply soft max at the end of our model to get a probs of each output
+            indexes = probs.argmax(-1)#argmax gets the index of the highest probability
+            predictedWords = [key[index] for index in indexes]
+            predictedConfidences = [pred[index] for index, pred in zip(indexes, probs)]
+            
+        return predictedWords, predictedConfidences
 
 
+# %% [markdown]
 # # dataSet for data loader
 
-# In[ ]:
-
-
+# %%
 class ASLDataset(Dataset):
     """
     This class helps us lazily load the data so memory doesn't blow up
@@ -388,7 +410,7 @@ class ASLDataset(Dataset):
         if pdCacheSize is not None:
             #This is trying to implement a sort of cache using pandas, that way
             # we don't have to read from disc 
-            self.pdCache:dict[str, pd.DataFrame] = {'landmarkDF':pd.DataFrame(), 'oheDF':pd.DataFrame()}
+            self.pdCache:dict[str, pd.DataFrame] | None = {'landmarkDF':pd.DataFrame(), 'oheDF':pd.DataFrame()}
         else:
             self.pdCache = None
             
@@ -408,6 +430,7 @@ class ASLDataset(Dataset):
     
     def __getitem__(self, index):
         if self.pdCacheSize is not None:
+            assert self.pdCache is not None, 'cache size is not none but pd cache is still not defined' # this should be true but this line helps the linter not panic
             
             # if index is not in cache load a new block of cache starting with index
             if index not in self.pdCache['landmarkDF'].index:
@@ -436,7 +459,7 @@ class ASLDataset(Dataset):
         
         X = torch.tensor(X, dtype=torch.float32, device=self.device)
         y = torch.tensor(y, dtype=torch.float32, device=self.device)
-        y = torch.argmax(y).long()
+        # y = torch.argmax(y).long()
         
         X = X.permute(1,0) #dimensions are flipped 
         
@@ -500,9 +523,11 @@ class PreloadedASLDataset(Dataset):
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]  # Already on GPU!
 
+
+# %% [markdown]
 # # Running Training code
 
-# In[ ]:
+# %%
 
 if __name__ == "__main__":
     
@@ -573,4 +598,55 @@ if __name__ == "__main__":
     trainer = L.Trainer(logger=logger, max_epochs=10000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
     trainer.fit(model, dataLoader, val_dataLoader)
 
-    
+# %% [markdown]
+# # testing inference function
+
+# %%
+def makeModel(modelFile):
+    longest_num_of_frames = 266
+    n_embedings = 93 # divisible by 1, 3, 31, 93
+    hiddenSize = n_embedings * 2
+    numberOfHeads = 3 # 93 % 3 == 0 is true
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
+                    hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, bias=False, device=device)
+    checkpoint = torch.load('../models/ASL_Model_.ckpt', map_location=device)
+    model.load_state_dict(checkpoint['state_dict'])
+    # model = Encoder.load_from_checkpoint('../models/ASL_Model_-v9.ckpt',map_location=torch.device('cpu'), input_features=357 , output_features=172, max_tokens=266, embed_dim=93, hiddenSize=93*2, numberOfHeads=3)
+
+    return model
+
+# %%
+
+def getConverters(path:str, columnsToDrop:list[str]=[])->dict:
+    df_columns = pd.read_csv(path, nrows=0).columns.to_list() #get columns
+    for col in columnsToDrop:
+        df_columns.remove(col)
+    return {col : ast.literal_eval for col in df_columns}
+
+colsToDrop = ['Video file', 'Gloss']
+inputPath = '../data/small_padd_training.csv'
+x = pd.read_csv(inputPath, nrows=10, index_col=0, converters=getConverters(inputPath, columnsToDrop=colsToDrop))
+x = x.drop(columns=colsToDrop)
+
+
+
+
+longest_num_of_frames = 266
+n_embedings = 93 # divisible by 1, 3, 31, 93
+hiddenSize = n_embedings * 2
+numberOfHeads = 3 # 93 % 3 == 0 is true
+dropOutPercent = 0
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
+                hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
+                bias=False, device=device)
+checkpoint = torch.load('../models/ASL_Model_.ckpt', map_location=device)
+model.load_state_dict(checkpoint['state_dict'])
+# model = Encoder.load_from_checkpoint('../models/ASL_Model_-v9.ckpt',map_location=torch.device('cpu'), input_features=357 , output_features=172, max_tokens=266, embed_dim=93, hiddenSize=93*2, numberOfHeads=3)
+
+model.predict(x)
+
+
