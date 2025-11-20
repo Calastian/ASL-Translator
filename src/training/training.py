@@ -1,7 +1,24 @@
 # %% [markdown]
 # # imports
 
+<<<<<<< HEAD
 # %%
+=======
+"""
+ASL Translator Training Script
+
+IMPORTANT FIX APPLIED:
+- Removed nn.Softmax from output layer (line ~278)
+- CrossEntropyLoss already applies softmax internally
+- Having both caused "double softmax" which broke training and caused model collapse
+- Softmax is now only applied in predict() method for inference
+- ALL PREVIOUS CHECKPOINTS (v1-v9) ARE BROKEN - Must retrain from scratch!
+"""
+
+# # imports
+
+# In[3]:
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
 
 
 import torch
@@ -28,7 +45,11 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 # %% [markdown]
 # # postitional encoding
 
+<<<<<<< HEAD
 # %%
+=======
+# In[4]:
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
 
 
 class PositionEncoding(nn.Module):
@@ -182,7 +203,11 @@ class Attention(nn.Module):
 # %% [markdown]
 # # FeedForwardNeuralNetwork
 
+<<<<<<< HEAD
 # %%
+=======
+# In[6]:
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
 
 
 class FeedForwardNetwork(nn.Module):
@@ -201,6 +226,14 @@ class FeedForwardNetwork(nn.Module):
             )
     def forward(self, x):
         return self.model(x)
+<<<<<<< HEAD
+=======
+
+
+# # encoder model
+
+# In[29]:
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
 
 # %% [markdown]
 # # encoder model
@@ -222,7 +255,11 @@ class Encoder(L.LightningModule):
         super().__init__()
         
         self.save_hyperparameters()#this is used for saving hyperparameters during callbacks
+<<<<<<< HEAD
                 
+=======
+        
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
         if embed_dim is None:
             embed_dim = input_features
             
@@ -275,8 +312,19 @@ class Encoder(L.LightningModule):
         # output layer
         ###############
         
+<<<<<<< HEAD
         self.outputLayer = nn.Linear(in_features=embed_dim * max_tokens, out_features=output_features, bias=bias, device=device)
         #don't include softmax because the loss function CrossEntropy applies the softmax function already, and if we include it it's applied twice
+=======
+        # Fixed: Removed Softmax because CrossEntropyLoss applies it internally
+        # Having both causes double softmax which breaks training
+        self.outputLayer = nn.Linear(
+            in_features=embed_dim * max_tokens, 
+            out_features=output_features, 
+            bias=bias, 
+            device=device
+        )
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
         
         ###############
         # how is loss calculated
@@ -324,7 +372,7 @@ class Encoder(L.LightningModule):
         like stochastic gradient decent except instead of using a fixed learning rate for all params
         it uses an adapted learning for each param
         """
-        return Adam(self.parameters(), lr=0.01)
+        return Adam(self.parameters(), lr=0.0001)
     
     def training_step(self, batch, batch_idx):
         input_tokens, labels = batch
@@ -365,6 +413,7 @@ class Encoder(L.LightningModule):
                     
         return loss
     
+<<<<<<< HEAD
     def predict(self, X):
         """
         This is the function that takes in input from a model and makes it proper output for our application
@@ -395,6 +444,52 @@ class Encoder(L.LightningModule):
 # # dataSet for data loader
 
 # %%
+=======
+    def predict(self, X, device = None):
+        tmpDF:pd.DataFrame = pd.read_csv('../../docs/Key_ASL.csv')
+        key:list = tmpDF['words'].tolist()  
+        
+        if device is None:
+            device = next(self.parameters()).device
+        
+        self.eval()  
+        self.to(device)
+        
+        predictions_list = []
+        confidences_list = []
+        
+        with torch.no_grad(): 
+            
+            for idx in X.index:
+                
+                sample = X.loc[idx]
+                sample_tensor = torch.tensor(sample.values.tolist(), dtype=torch.float32, device=device)
+                
+                sample_tensor = sample_tensor.permute(1, 0)
+                
+                sample_tensor = sample_tensor.unsqueeze(0)
+                
+                output = self(sample_tensor)  
+                
+                probs = F.softmax(output, dim=1)
+                
+                confidence, pred_idx = torch.max(probs, dim=1)
+                
+                predicted_word = key[pred_idx.item()]
+                conf_value = confidence.item()
+                
+                predictions_list.append(predicted_word)
+                confidences_list.append(conf_value)
+                
+                print(f"Sample {idx}: {predicted_word} (confidence: {conf_value:.4f})")
+        
+        return predictions_list, confidences_list
+
+
+# In[ ]:
+
+
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
 class ASLDataset(Dataset):
     """
     This class helps us lazily load the data so memory doesn't blow up
@@ -459,7 +554,11 @@ class ASLDataset(Dataset):
         
         X = torch.tensor(X, dtype=torch.float32, device=self.device)
         y = torch.tensor(y, dtype=torch.float32, device=self.device)
+<<<<<<< HEAD
         # y = torch.argmax(y).long()
+=======
+        y = torch.argmax(y).long()  # Convert one-hot to class index (REQUIRED for CrossEntropyLoss)
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
         
         X = X.permute(1,0) #dimensions are flipped 
         
@@ -507,7 +606,7 @@ class PreloadedASLDataset(Dataset):
             # Create tensors (same as ASLDataset)
             X = torch.tensor(X, dtype=torch.float32, device=device)
             y = torch.tensor(y, dtype=torch.float32, device=device)
-            # y = torch.argmax(y).long()  # Convert one-hot to class index
+            y = torch.argmax(y).long()  # Convert one-hot to class index (REQUIRED for CrossEntropyLoss)
             
             X = X.permute(1,0)  # Flip dimensions (same as ASLDataset)
             
@@ -524,10 +623,25 @@ class PreloadedASLDataset(Dataset):
         return self.features[idx], self.labels[idx]  # Already on GPU!
 
 
+<<<<<<< HEAD
 # %% [markdown]
 # # Running Training code
 
 # %%
+=======
+# # Running Training code
+
+
+def getConverters(path:str, columnsToDrop:list[str]=[])->dict:
+    df_columns = pd.read_csv(path, nrows=0).columns.to_list() #get columns
+    for col in columnsToDrop:
+        df_columns.remove(col)
+    return {col : ast.literal_eval for col in df_columns}
+
+
+# In[ ]:
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
+
 
 if __name__ == "__main__":
     
@@ -551,7 +665,7 @@ if __name__ == "__main__":
     n_embedings = 93 # divisible by 1, 3, 31, 93
     hiddenSize = n_embedings * 2
     numberOfHeads = 3 # 93 % 3 == 0 is true
-    dropOutPercent = 0
+    dropOutPercent = 0.1
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
@@ -587,7 +701,7 @@ if __name__ == "__main__":
     checkpoint_callback = ModelCheckpoint(
         dirpath="../models/",
         filename="ASL_Model_",
-        save_top_k =5,
+        save_top_k =20,
         monitor="val_loss",
         mode="min"
     )
@@ -595,9 +709,38 @@ if __name__ == "__main__":
     # overfitTrainer = L.Trainer(logger=overfitLogger,max_epochs=100, accelerator='gpu', devices=1, callbacks=[checkpoint_callback], overfit_batches=1)
     # overfitTrainer.fit(model, dataLoader, val_dataLoader)
     
-    trainer = L.Trainer(logger=logger, max_epochs=10000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
+    trainer = L.Trainer(logger=logger, max_epochs=50000, accelerator='gpu', devices=1, callbacks=[checkpoint_callback])
     trainer.fit(model, dataLoader, val_dataLoader)
+    
+    
+    # colsToDrop = ['Video file', 'Gloss']
+    # inputPath = '../data/small_padd_training.csv'
+    # x = pd.read_csv(inputPath, nrows=10, index_col=0, converters=getConverters(inputPath, columnsToDrop=colsToDrop))
+    # x = x.drop(columns=colsToDrop)
+    
+    
+    
+    
+    # longest_num_of_frames = 266
+    # n_embedings = 93 # divisible by 1, 3, 31, 93
+    # hiddenSize = n_embedings * 2
+    # numberOfHeads = 3 # 93 % 3 == 0 is true
+    # dropOutPercent = 0
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # model = Encoder(input_features=357, output_features=172, embed_dim=n_embedings, max_tokens=longest_num_of_frames,
+    #                 hidden_size=hiddenSize, num_heads=numberOfHeads, batch_first=True, dropOut=dropOutPercent,
+    #                 bias=False, device=device)
+    # checkpoint = torch.load('../models/ASL_Model_-v1.ckpt', map_location=torch.device('cpu'))
+    # model.load_state_dict(checkpoint['state_dict'])
+    # # model = Encoder.load_from_checkpoint('../models/ASL_Model_-v9.ckpt',map_location=torch.device('cpu'), input_features=357 , output_features=172, max_tokens=266, embed_dim=93, hiddenSize=93*2, numberOfHeads=3)
+    
+    # model.predict(x, device)
 
+# # testing inference function
+
+
+<<<<<<< HEAD
 # %% [markdown]
 # # testing inference function
 
@@ -650,3 +793,5 @@ model.load_state_dict(checkpoint['state_dict'])
 model.predict(x)
 
 
+=======
+>>>>>>> b649bc7526fa78ae118c6f05dcf9b9dca095d4ef
