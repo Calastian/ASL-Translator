@@ -43,7 +43,7 @@ BATCH_SIZE = 128
 N_WORKERS = 2
 
 DATA_DIRECTORY = './training_data/'
-DATA_PREFIX = '' #use 'small_' for the small data 
+DATA_PREFIX = 'small_' #use 'small_' for the small data 
 
 TRAIN_X_FILE = DATA_DIRECTORY + DATA_PREFIX + "padd_training.csv"
 TRAIN_Y_FILE = DATA_DIRECTORY + DATA_PREFIX + "training_encoding.csv"
@@ -56,7 +56,7 @@ VAL_N_SAMPLES = 624
 LOGGER = TensorBoardLogger('tb_log', 'model_V0')
 
 CHECKPOINTS = [ModelCheckpoint(
-        dirpath="../models/",
+        dirpath="./models/",
         filename="ASL_Model_",
         save_top_k =20,
         monitor="val_loss",
@@ -71,7 +71,7 @@ OVERFIT_BATCH = False
 OVERFIT_EPOCS = 100
 OVERFIT_LOGGER = TensorBoardLogger('OverfitLogs', 'BatchOverFitModel')
 OVERFIT_CHECKPOINTS = [ModelCheckpoint(
-        dirpath="../models/",
+        dirpath="./models/",
         filename="ASL_Model_",
         save_top_k =20,
         monitor="val_loss",
@@ -80,7 +80,11 @@ OVERFIT_CHECKPOINTS = [ModelCheckpoint(
 OVERFIT_N_BATCHES = 1
 
 # inference
-MODEL_FILE = '../models/ASL_Model_.ckpt'
+MODEL_FILE = './models/ASL_Model_.ckpt'
+
 INPUT_FILE = DATA_DIRECTORY + DATA_PREFIX + "padd_val.csv" # can be changed to whatever input file, just make sure data needed to be droped is in the COLS_TO_DROP constant
 COLS_TO_DROP = ['Video file', 'Gloss']
 N_PREDICTIONS = 10
+
+#key file
+KEY_FILE = '../docs/Key_ASL.csv'

@@ -11,6 +11,9 @@ import lightning as L
 
 import pandas as pd
 
+#our imports
+import config
+
 # %% [markdown]
 # # postitional encoding
 
@@ -362,7 +365,7 @@ class Encoder(L.LightningModule):
         """
         This is the function that takes in input from a model and makes it proper output for our application
         """
-        tmpDF:pd.DataFrame = pd.read_csv('../../docs/Key_ASL.csv')
+        tmpDF:pd.DataFrame = pd.read_csv(config.KEY_FILE)
         key:list = tmpDF['words'].tolist()
         
         X = X.values.tolist()
