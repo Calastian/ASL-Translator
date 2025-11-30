@@ -23,7 +23,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 #%%
 #model characteristics
 N_INPUTS = 357
-N_OUTPUTS = 172
+N_OUTPUTS = 4
 MAX_TOKENS = 266
 N_EMBEDDINGS = 93
 
@@ -38,24 +38,24 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 #%%
 #for learning
-EPOCS = 10000
+EPOCS = 100
 DROP_OUT = 0.1
 LR = .0001
 
-BATCH_SIZE = 128
+BATCH_SIZE = 80
 N_WORKERS = 2
 
-PREFIX_DIRECTORY= 'small/' #choose which 
+PREFIX_DIRECTORY= 'christian/' #choose which 
 
 DATA_DIRECTORY = './training_data/'
 
-TRAIN_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_training.csv"
-TRAIN_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "training_encoding.csv"
-TRAIN_N_SAMPLES = 2444
+TRAIN_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_train.csv"
+TRAIN_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "train_encoding.csv"
+TRAIN_N_SAMPLES = 80
 
 VAL_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" 
 VAL_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "val_encoding.csv"
-VAL_N_SAMPLES = 624
+VAL_N_SAMPLES = 20
 
 MODEL_DIRECTORY = './models/' 
 MODEL_PREFIX_DIRECTORY = '' #change to 'small/ for small models stuff
@@ -67,7 +67,7 @@ LOGGER = TensorBoardLogger(MODEL_DIRECTORY + PREFIX_DIRECTORY + 'tb_log', MODEL_
 CHECKPOINTS = [ModelCheckpoint(
         dirpath=MODEL_DIRECTORY+PREFIX_DIRECTORY,
         filename=MODEL_NAME,
-        save_top_k =20,
+        save_top_k =5,
         monitor="val_loss",
         mode="min"
 )]
@@ -84,7 +84,7 @@ OVERFIT_LOGGER = TensorBoardLogger(MODEL_DIRECTORY+PREFIX_DIRECTORY+'OverfitLogs
 OVERFIT_CHECKPOINTS = [ModelCheckpoint(
         dirpath=MODEL_DIRECTORY+PREFIX_DIRECTORY,
         filename=MODEL_NAME,
-        save_top_k =20,
+        save_top_k =5,
         monitor="val_loss",
         mode="min"
 )]
@@ -92,11 +92,11 @@ OVERFIT_N_BATCHES = 1
 
 #%%
 # inference
-MODEL_FILE = './models/ASL_Model_.ckpt'
+MODEL_FILE = './models/christian/ASL_Model_.ckpt'
 
 INPUT_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" # can be changed to whatever input file, just make sure data needed to be droped is in the COLS_TO_DROP constant
 COLS_TO_DROP = ['Video file', 'Gloss']
-N_PREDICTIONS = 10
+N_PREDICTIONS = 5
 
 #key file
-KEY_FILE = '../docs/Key_ASL.csv'
+KEY_FILE = '../docs/Christian_Key_ASL.csv'

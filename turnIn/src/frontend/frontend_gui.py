@@ -17,6 +17,7 @@ class GUI:
         self.video_dir = None
         self.video_count = 1
         self.setup_ui()
+        self.output_dir = "recordings/"
 
     def setup_ui(self):
         self.camera_btn = tk.Button(self.root, text="Open Camera", command=self.toggle_camera)
@@ -61,7 +62,7 @@ class GUI:
         cap = cv2.VideoCapture(0)
         recording = False
         out = None
-        output_dir = "recordings/val/"
+        output_dir = self.output_dir
         os.makedirs(output_dir, exist_ok=True)
         datetime = date.datetime
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -75,7 +76,7 @@ class GUI:
                 cv2.imshow('Camera', frame)
                 
                 if key == ord("r") and not recording:
-                    output_filename = os.path.join(output_dir, f"{self.video_count}-We.mp4") # This is where we change the word for recording!
+                    output_filename = os.path.join(output_dir, f"{self.video_count}.mp4") # This is where we change the word for recording!
                     out = cv2.VideoWriter(output_filename, fourcc, fps, (frame_width, frame_height))
                     recording = True
                     self.video_count += 1

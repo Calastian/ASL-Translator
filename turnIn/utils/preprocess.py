@@ -526,8 +526,8 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
 
 # %%
 if __name__ == '__main__':
-    makePreProcessedData('archive/ASL_Citizen/splits/train.csv','archive/ASL_Citizen/videos/',
-                    'processedData/output.csv', 'Key_ASL.csv', chunkSize=5, startIndex=0,stopIndex=5)
+    makePreProcessedData('../docs/val_glossary.csv','../src/frontend/recordings/val/',
+                    '../src/training_data/christian_data/christian_val.csv', '../docs/Christian_Key_ASL.csv')
 
 # %% [markdown]
 # # make processed dataframe for front end
