@@ -18,3 +18,4 @@ ASL_Citizen/
 *.csv
 Finished_Output.csv
 *.ckpt
+.vscode/
