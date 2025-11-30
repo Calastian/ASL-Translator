@@ -3,8 +3,8 @@ import pandas as pd
 import ast
 
 #our imports
-from architecture import Encoder
-import config
+from .architecture import Encoder
+from . import config
 
 def makeModel(modelFile):
     model = Encoder(input_features=config.N_INPUTS, output_features=config.N_OUTPUTS,

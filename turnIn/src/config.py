@@ -47,25 +47,26 @@ N_WORKERS = 2
 
 PREFIX_DIRECTORY= 'christian/' #choose which 
 
+PATH_FROM_ROOT = './src/'
+
 DATA_DIRECTORY = './training_data/'
 
-TRAIN_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_train.csv"
-TRAIN_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "train_encoding.csv"
+TRAIN_X_FILE = PATH_FROM_ROOT+ DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_train.csv"
+TRAIN_Y_FILE = PATH_FROM_ROOT+ DATA_DIRECTORY + PREFIX_DIRECTORY + "train_encoding.csv"
 TRAIN_N_SAMPLES = 80
 
-VAL_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" 
-VAL_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "val_encoding.csv"
+VAL_X_FILE = PATH_FROM_ROOT+ DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" 
+VAL_Y_FILE = PATH_FROM_ROOT+ DATA_DIRECTORY + PREFIX_DIRECTORY + "val_encoding.csv"
 VAL_N_SAMPLES = 20
 
 MODEL_DIRECTORY = './models/' 
-MODEL_PREFIX_DIRECTORY = '' #change to 'small/ for small models stuff
 
 MODEL_NAME = 'ASL_Model_'
 
-LOGGER = TensorBoardLogger(MODEL_DIRECTORY + PREFIX_DIRECTORY + 'tb_log', MODEL_NAME)
+LOGGER = TensorBoardLogger(PATH_FROM_ROOT+ MODEL_DIRECTORY + PREFIX_DIRECTORY + 'tb_log', MODEL_NAME)
 
 CHECKPOINTS = [ModelCheckpoint(
-        dirpath=MODEL_DIRECTORY+PREFIX_DIRECTORY,
+        dirpath=PATH_FROM_ROOT+ MODEL_DIRECTORY+PREFIX_DIRECTORY,
         filename=MODEL_NAME,
         save_top_k =5,
         monitor="val_loss",
@@ -80,9 +81,9 @@ DEVICES = 1 #set to negative one to use all available devices
 #Need to run training cell first
 OVERFIT_BATCH = False
 OVERFIT_EPOCS = 100
-OVERFIT_LOGGER = TensorBoardLogger(MODEL_DIRECTORY+PREFIX_DIRECTORY+'OverfitLogs', MODEL_NAME)
+OVERFIT_LOGGER = TensorBoardLogger(PATH_FROM_ROOT+ MODEL_DIRECTORY+PREFIX_DIRECTORY+'OverfitLogs', MODEL_NAME)
 OVERFIT_CHECKPOINTS = [ModelCheckpoint(
-        dirpath=MODEL_DIRECTORY+PREFIX_DIRECTORY,
+        dirpath=PATH_FROM_ROOT+ MODEL_DIRECTORY+PREFIX_DIRECTORY,
         filename=MODEL_NAME,
         save_top_k =5,
         monitor="val_loss",
@@ -92,11 +93,11 @@ OVERFIT_N_BATCHES = 1
 
 #%%
 # inference
-MODEL_FILE = './models/christian/ASL_Model_.ckpt'
+MODEL_FILE = PATH_FROM_ROOT+ './models/christian/ASL_Model_.ckpt'
 
-INPUT_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" # can be changed to whatever input file, just make sure data needed to be droped is in the COLS_TO_DROP constant
+INPUT_FILE = PATH_FROM_ROOT+ DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" # can be changed to whatever input file, just make sure data needed to be droped is in the COLS_TO_DROP constant
 COLS_TO_DROP = ['Video file', 'Gloss']
 N_PREDICTIONS = 5
 
 #key file
-KEY_FILE = '../docs/Christian_Key_ASL.csv'
+KEY_FILE = PATH_FROM_ROOT+ '../docs/Christian_Key_ASL.csv'

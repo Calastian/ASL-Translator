@@ -8,9 +8,9 @@ from torch.utils.data import DataLoader
 import lightning as L
 
 #our imports
-from architecture import Encoder
-from dataSet import PreloadedASLDataset
-import config
+from .architecture import Encoder
+from .dataSet import PreloadedASLDataset
+from . import config
 
 # %% [markdown]
 # # Running Training code

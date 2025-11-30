@@ -6,7 +6,18 @@ import threading
 import datetime as date
 from llama_cpp import Llama
 
+import mediapipe as mp
+import numpy as np
+mp_drawing = mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+mp_holistic = mp.solutions.holistic
 
+import pandas as pd
+
+#our imports
+from .modelCode import Model
+from ...utils.preprocess import initialize_FrameModelOutput_Data, showLandmarksFrame
+from ...utils.preprocess import getLandmarkOutput, append_FrameModelOutput_Data
 
 
 class GUI:
@@ -18,6 +29,8 @@ class GUI:
         self.video_count = 1
         self.setup_ui()
         self.output_dir = "recordings/"
+        
+        self.model = Model('C:/Users/sonic/Documents/1Classes/7_2025 Fall/capstone/ASL-Translator/src/training/models/ASL_Model_.ckpt')
 
     def setup_ui(self):
         self.camera_btn = tk.Button(self.root, text="Open Camera", command=self.toggle_camera)
@@ -68,30 +81,43 @@ class GUI:
         frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30 
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
-        while self.camera_on:
-            ret, frame = cap.read()
-            key = cv2.waitKey(1) & 0xFF
-            if ret:
-                cv2.imshow('Camera', frame)
-                
-                if key == ord("r") and not recording:
-                    output_filename = os.path.join(output_dir, f"{self.video_count}.mp4") # This is where we change the word for recording!
-                    out = cv2.VideoWriter(output_filename, fourcc, fps, (frame_width, frame_height))
-                    recording = True
-                    self.video_count += 1
-                    print(f"Recording started: {output_filename}")
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+         
+        data:dict = initialize_FrameModelOutput_Data()  
+        with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:    
+            while self.camera_on:
+                ret, frame = cap.read()
+                key = cv2.waitKey(1) & 0xFF
+                if ret:
+                    cv2.imshow('Camera', frame)
                     
-                elif key == ord('s') and recording:
-                    recording = False
-                    out.release()
-                    print("Recording Stopped")
+                    if recording:
+                        modelOutput, image = getLandmarkOutput(frame, holistic) 
+                        append_FrameModelOutput_Data(modelOutput, data)
+                        showLandmarksFrame(image, modelOutput)
                     
-                if recording:
-                    out.write(frame)
-                
-                if key == ord('q'):
-                    break
+                    if key == ord("r") and not recording:
+                        output_filename = os.path.join(output_dir, f"{self.video_count}.mp4") # This is where we change the word for recording!
+                        out = cv2.VideoWriter(output_filename, fourcc, fps, (frame_width, frame_height))
+                        recording = True
+                        self.video_count += 1
+                        print(f"Recording started: {output_filename}")  
+                        
+                    elif key == ord('s') and recording:
+                        recording = False
+                        out.release()
+                        print("Recording Stopped")
+                        
+                        recording_result = self.model.predictDict(data)
+                        print(recording_result)
+                        data = initialize_FrameModelOutput_Data()
+                        
+                        
+                    if recording:
+                        out.write(frame)
+                    
+                    if key == ord('q'):
+                        break
         cap.release()
         if out is not None:
             out.release()

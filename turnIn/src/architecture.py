@@ -12,7 +12,7 @@ import lightning as L
 import pandas as pd
 
 #our imports
-import config
+from . import config
 
 # %% [markdown]
 # # postitional encoding

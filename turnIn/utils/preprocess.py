@@ -72,6 +72,18 @@ def showFrame(image, modelOutput):
     justDetections = blackScreen
     drawLandmarksOnImage(modelOutput, justDetections)
     cv2.imshow('Detections Feed', justDetections)
+    
+# %%
+def showLandmarksFrame(image, modelOutput):    
+    #show new image in python window
+    drawLandmarksOnImage(modelOutput, image)
+    cv2.imshow('Mediapipe Feed', image)
+    
+    #show only detections in python window
+    blackScreen = np.zeros(image.shape)
+    justDetections = blackScreen
+    drawLandmarksOnImage(modelOutput, justDetections)
+    cv2.imshow('Detections Feed', justDetections)
 
 # %% [markdown]
 # # Processesing tools
