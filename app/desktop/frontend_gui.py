@@ -75,7 +75,7 @@ class GUI:
                 cv2.imshow('Camera', frame)
                 
                 if key == ord("r") and not recording:
-                    output_filename = os.path.join(output_dir, f"Video_{self.video_count}.mp4")
+                    output_filename = os.path.join(output_dir, f"{self.video_count}-Project.mp4") # This is where we change the word for recording!
                     out = cv2.VideoWriter(output_filename, fourcc, fps, (frame_width, frame_height))
                     recording = True
                     self.video_count += 1
