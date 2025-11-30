@@ -499,7 +499,8 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
     
     if stopIndex is None:
         stopIndex = numRows
-    stopIndex+=1
+    
+    stopIndex += 1
     for i in range(startIndex, stopIndex, chunkSize):
         if i+chunkSize > stopIndex:
             chunkSize = stopIndex - i
@@ -524,7 +525,33 @@ def makePreProcessedData(glossCSVPath,videoFolderPath,outputCSVFilePath,filterCS
     print(f"finished processing videos to {outputCSVFilePath}")
 
 # %%
-# makePreProcessedData('archive/ASL_Citizen/splits/train.csv','archive/ASL_Citizen/videos/',
-#                   'processedData/output.csv', 'Key_ASL.csv', chunkSize=10, startIndex=100)
+if __name__ == '__main__':
+    makePreProcessedData('archive/ASL_Citizen/splits/train.csv','archive/ASL_Citizen/videos/',
+                    'processedData/output.csv', 'Key_ASL.csv', chunkSize=5, startIndex=0,stopIndex=5)
+
+# %% [markdown]
+# # make processed dataframe for front end
+
+# %%
+def makePaddingFlagColumn(row, newLen):
+    numFrames = len(row.iloc[0])
+    lenDifference = newLen - numFrames
+    assert lenDifference >= 0, f'Video longer than {newLen} frames' 
+    return ([0]*numFrames) + ([1] * lenDifference)
+
+# %%
+def paddToLen(ls, newLen):
+    lenDifference = newLen - len(ls)
+    assert lenDifference >= 0, f'Video longer than {newLen} frames' 
+    return ls + ([-999] * (lenDifference))
+
+# %%
+def makePreProcessedDataForFrontEndWithPadding(filePaths:list[str], paddingLen)->pd.DataFrame:
+    df = pd.DataFrame({'Video file':filePaths})
+    df = df.apply(lambda row: processVideoFile(row['Video file']), axis=1, result_type='expand')#result_type='expand' unrolls the dictionaries from processVideoFile into a list of data frames, which allows us to join them later so we don't just get one big column, we get several columns
+    paddingColumn = df.apply(lambda row: makePaddingFlagColumn(row, paddingLen),axis=1)
+    df = df.map(lambda cell: paddToLen(cell, paddingLen))
+    df.insert(0,'padding',paddingColumn)
+    return df
 
 
