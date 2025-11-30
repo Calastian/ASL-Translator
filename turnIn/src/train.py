@@ -21,7 +21,7 @@ if __name__ == "__main__":
                     embed_dim=config.N_EMBEDDINGS, max_tokens=config.MAX_TOKENS,
                     hidden_size=config.HIDDEN_SIZE, num_heads=config.N_HEADS,
                     bias=config.BIAS, eps=config.EPS, device=config.DEVICE,
-                    dropOut=config.LR, lr=config.LR)
+                    dropOut=config.DROP_OUT, lr=config.LR)
      
     dataset = PreloadedASLDataset(config.TRAIN_X_FILE, config.TRAIN_Y_FILE,
                                   length=config.TRAIN_N_SAMPLES, device=config.DEVICE)    
