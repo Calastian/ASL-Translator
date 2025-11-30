@@ -123,7 +123,7 @@ class GUI:
         # This is where we will call the llm to combine ouputs into sentence
         llm_input = " ".join(input_list)
         # MODEL_PATH = "../../src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
-        MODEL_PATH = "../../src/models/phi-2.Q4_K_M.gguf"
+        MODEL_PATH = "./llm_model/phi-2.Q4_K_M.gguf"
         
         llm = Llama(model_path=MODEL_PATH)
         prompt = f"Make a correct and fluent English sentence using these words: {llm_input}"
