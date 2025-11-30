@@ -34,7 +34,7 @@ N_HEADS = 3 #number of heads needs to be a factor of N_EMBEDDINGS
 
 EPS = .0001 #for normalization layers
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #%%
 #for learning
