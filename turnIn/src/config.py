@@ -47,7 +47,7 @@ N_WORKERS = 2
 
 PREFIX_DIRECTORY= 'christian/' #choose which 
 
-PATH_FROM_ROOT = './src/'
+PATH_FROM_ROOT = './turnIn/src/'
 
 DATA_DIRECTORY = './training_data/'
 
@@ -73,7 +73,7 @@ CHECKPOINTS = [ModelCheckpoint(
         mode="min"
 )]
 
-ACCELERATOR = 'gpu'
+ACCELERATOR = 'auto'
 DEVICES = 1 #set to negative one to use all available devices
 
 #%%

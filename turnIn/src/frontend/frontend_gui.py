@@ -11,13 +11,18 @@ import numpy as np
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_holistic = mp.solutions.holistic
-
+import os
+import sys
 import pandas as pd
 
 #our imports
 from .modelCode import Model
 from ...utils.preprocess import initialize_FrameModelOutput_Data, showLandmarksFrame
 from ...utils.preprocess import getLandmarkOutput, append_FrameModelOutput_Data
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', '..'))
+
 
 
 class GUI:
@@ -28,10 +33,11 @@ class GUI:
         self.video_dir = None
         self.video_count = 1
         self.setup_ui()
-        self.output_dir = "recordings/"
         
-        self.model = Model('C:/Users/sonic/Documents/1Classes/7_2025 Fall/capstone/ASL-Translator/src/training/models/ASL_Model_.ckpt')
-
+        self.output_dir = "./turnIn/src/frontend/recordings" 
+        
+        self.model = Model("./turnIn/src/models/christian/ASL_Model_.ckpt")
+    
     def setup_ui(self):
         self.camera_btn = tk.Button(self.root, text="Open Camera", command=self.toggle_camera)
         self.camera_btn.pack()
@@ -150,7 +156,9 @@ class GUI:
         # This is where we will call the llm to combine ouputs into sentence
         llm_input = " ".join(input_list)
         # MODEL_PATH = "../../src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
-        MODEL_PATH = "./llm_model/phi-2.Q4_K_M.gguf"
+        MODEL_PATH = "./turnIn/src/frontend/llm_model/phi-2.Q4_K_M.gguf"
+        # MODEL_PATH = os.path.join(PROJECT_ROOT, "llm_model", "phi-2.Q4_K_M.gguf")
+        
         
         llm = Llama(model_path=MODEL_PATH)
         prompt = f"Make a correct and fluent English sentence using these words: {llm_input}"
@@ -164,8 +172,6 @@ class GUI:
         
 
     def run_model(self, video_path):
-        # this should call the class with the trained model and then return a str or something
-        # Placeholder implementation to avoid indentation error; replace with real model invocation.
         
         
         return "Model not implemented"
