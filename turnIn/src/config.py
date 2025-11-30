@@ -20,6 +20,8 @@ import torch
 from pytorch_lightning.loggers import TensorBoardLogger
 from lightning.pytorch.callbacks import ModelCheckpoint
 
+#%%
+#model characteristics
 N_INPUTS = 357
 N_OUTPUTS = 172
 MAX_TOKENS = 266
@@ -34,6 +36,7 @@ EPS = .0001 #for normalization layers
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
+#%%
 #for learning
 EPOCS = 10000
 DROP_OUT = 0.1
@@ -42,22 +45,28 @@ LR = .0001
 BATCH_SIZE = 128
 N_WORKERS = 2
 
-DATA_DIRECTORY = './training_data/'
-DATA_PREFIX = 'small_' #use 'small_' for the small data 
+PREFIX_DIRECTORY= 'small/' #choose which 
 
-TRAIN_X_FILE = DATA_DIRECTORY + DATA_PREFIX + "padd_training.csv"
-TRAIN_Y_FILE = DATA_DIRECTORY + DATA_PREFIX + "training_encoding.csv"
+DATA_DIRECTORY = './training_data/'
+
+TRAIN_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_training.csv"
+TRAIN_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "training_encoding.csv"
 TRAIN_N_SAMPLES = 2444
 
-VAL_X_FILE = DATA_DIRECTORY + DATA_PREFIX + "padd_val.csv" 
-VAL_Y_FILE = DATA_DIRECTORY + DATA_PREFIX + "val_encoding.csv"
+VAL_X_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" 
+VAL_Y_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "val_encoding.csv"
 VAL_N_SAMPLES = 624
 
-LOGGER = TensorBoardLogger('tb_log', 'model_V0')
+MODEL_DIRECTORY = './models/' 
+MODEL_PREFIX_DIRECTORY = '' #change to 'small/ for small models stuff
+
+MODEL_NAME = 'ASL_Model_'
+
+LOGGER = TensorBoardLogger(MODEL_DIRECTORY + PREFIX_DIRECTORY + 'tb_log', MODEL_NAME)
 
 CHECKPOINTS = [ModelCheckpoint(
-        dirpath="./models/",
-        filename="ASL_Model_",
+        dirpath=MODEL_DIRECTORY+PREFIX_DIRECTORY,
+        filename=MODEL_NAME,
         save_top_k =20,
         monitor="val_loss",
         mode="min"
@@ -66,23 +75,26 @@ CHECKPOINTS = [ModelCheckpoint(
 ACCELERATOR = 'gpu'
 DEVICES = 1 #set to negative one to use all available devices
 
+#%%
 #Over fit batch to make check pipeline and bottle necks
+#Need to run training cell first
 OVERFIT_BATCH = False
 OVERFIT_EPOCS = 100
-OVERFIT_LOGGER = TensorBoardLogger('OverfitLogs', 'BatchOverFitModel')
+OVERFIT_LOGGER = TensorBoardLogger(MODEL_DIRECTORY+PREFIX_DIRECTORY+'OverfitLogs', MODEL_NAME)
 OVERFIT_CHECKPOINTS = [ModelCheckpoint(
-        dirpath="./models/",
-        filename="ASL_Model_",
+        dirpath=MODEL_DIRECTORY+PREFIX_DIRECTORY,
+        filename=MODEL_NAME,
         save_top_k =20,
         monitor="val_loss",
         mode="min"
 )]
 OVERFIT_N_BATCHES = 1
 
+#%%
 # inference
 MODEL_FILE = './models/ASL_Model_.ckpt'
 
-INPUT_FILE = DATA_DIRECTORY + DATA_PREFIX + "padd_val.csv" # can be changed to whatever input file, just make sure data needed to be droped is in the COLS_TO_DROP constant
+INPUT_FILE = DATA_DIRECTORY + PREFIX_DIRECTORY + "padd_val.csv" # can be changed to whatever input file, just make sure data needed to be droped is in the COLS_TO_DROP constant
 COLS_TO_DROP = ['Video file', 'Gloss']
 N_PREDICTIONS = 10
 
