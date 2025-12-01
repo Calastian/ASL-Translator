@@ -3,8 +3,8 @@
 if [ ! -d "venv" ]; then
   python3 -m venv venv
   source venv/bin/activate
-  pip install -r ./env/requirements.txt
+  pip install -r ./env/linux_requirements.txt
 else
   source venv/bin/activate
 fi
-python3 ./app/desktop/frontend_gui.py
+python3 -m turnIn.src.frontend.frontend_gui

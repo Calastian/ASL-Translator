@@ -8,5 +8,5 @@ IF NOT EXIST venv (
     call venv\Scripts\activate
 )
 REM Run your frontend app
-python .\app\desktop\frontend_gui.py
+python -m turnIn.src.frontend.frontend_gui
 pause
