@@ -33,4 +33,4 @@ if __name__ == '__main__':
     x = x.drop(columns=config.COLS_TO_DROP)
 
     model = makeModel(config.MODEL_FILE)
-    model.predict(x)
+    print(model.predict(x))

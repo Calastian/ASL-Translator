@@ -47,7 +47,7 @@ N_WORKERS = 2
 
 PREFIX_DIRECTORY= 'small/' #choose which 
 
-PATH_FROM_ROOT = './src/'
+PATH_FROM_ROOT = './turnIn/src/'
 
 DATA_DIRECTORY = './training_data/'
 

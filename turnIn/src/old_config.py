@@ -47,7 +47,7 @@ N_WORKERS = 2
 
 PREFIX_DIRECTORY= 'big/' #choose which 
 
-PATH_FROM_ROOT = './src/'
+PATH_FROM_ROOT = './turnIn/src/'
 
 DATA_DIRECTORY = './training_data/'
 
@@ -85,7 +85,7 @@ OVERFIT_LOGGER = TensorBoardLogger(PATH_FROM_ROOT + MODEL_DIRECTORY+PREFIX_DIREC
 OVERFIT_CHECKPOINTS = [ModelCheckpoint(
         dirpath=PATH_FROM_ROOT + MODEL_DIRECTORY+PREFIX_DIRECTORY,
         filename=MODEL_NAME,
-        save_top_k =20,
+        save_top_k =5,
         monitor="val_loss",
         mode="min"
 )]
