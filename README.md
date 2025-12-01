@@ -16,9 +16,8 @@ ASL-Translator is a machine learning-powered tool that translates American Sign 
 
 - **Real-time ASL gesture recognition**
 - **Text output for recognized signs**
-- **User-friendly interface (web/mobile)**
+- **User-friendly interface**
 - **Modular, extensible codebase**
-- **Open to contributions and feedback**
 
 ---
 
