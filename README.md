@@ -24,7 +24,9 @@ ASL-Translator is a machine learning-powered tool that translates American Sign 
 
 ## Quick Start
 
+
 1. **Unzip the folder.**
+2. **Create Virtual ENV** Call it myenv: create it with python -m venv myenv, then (if linux source myenv/bin/activate) .\myenv\Scripts\activate install packages my running pip install -r (if linux linux_requirements.txt) requirements.txt
 2. **Windows:** Double-click `run_windows.bat`
 3. **Linux/Mac:** Open a terminal in the folder, and run:
    ```
@@ -48,8 +50,7 @@ The first launch will install requirements automatically.
 
 - Place your video files in the appropriate folder (desktop/recordings).
 - Download Phi model URL: https://huggingface.co/TheBloke/phi-2-GGUF?show_file_info=phi-2.Q4_K_M.gguf
+- This is the Resource for the ASL data set: https://www.kaggle.com/datasets/abd0kamel/asl-citizen
 
 ## Troubleshooting
-
-- If you get missing DLL/C++ errors, install MSVC (Windows), or `build-essential` (Linux).
 - For environment issues, delete the `venv` folder and re-launch the script.
