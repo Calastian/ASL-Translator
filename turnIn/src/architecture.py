@@ -95,7 +95,7 @@ class PositionEncoding(nn.Module):
         
         this method just looks up the precalculated positional encodings
         """
-        return embeddings + self.pe[:, :self.d_model] # this needed to be flipped for oue model
+        return embeddings + self.pe[:, :self.d_model].to(embeddings.device) # this needed to be flipped for oue model
 
 
 # %% [markdown]

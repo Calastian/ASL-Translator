@@ -20,8 +20,6 @@ from .modelCode import Model
 from ...utils.preprocess import initialize_FrameModelOutput_Data, showLandmarksFrame
 from ...utils.preprocess import getLandmarkOutput, append_FrameModelOutput_Data
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, '..', '..', '..'))
 
 
 
@@ -32,33 +30,88 @@ class GUI:
         self.camera_on = False
         self.video_dir = None
         self.video_count = 1
+        self.llm_words = []
+        self.landmark = False
         self.setup_ui()
-        
         self.output_dir = "./turnIn/src/frontend/recordings" 
         
         self.model = Model("./turnIn/src/models/christian/ASL_Model_.ckpt")
     
     def setup_ui(self):
-        self.camera_btn = tk.Button(self.root, text="Open Camera", command=self.toggle_camera)
-        self.camera_btn.pack()
+        # self.camera_btn = tk.Button(self.root, text="Open Camera", command=self.toggle_camera)
+        # self.camera_btn.pack()
         
-        self.dir_btn = tk.Button(self.root, text="Select Video Directory", command=self.select_directory)
-        self.dir_btn.pack()
+        # self.landmark_btn = tk.Button(self.root, text="Start Landmarks", command=self.toggle_landmark)
+        # self.landmark_btn.pack(side=tk.RIGHT, padx=10, pady=10)
+                
+        # self.dir_btn = tk.Button(self.root, text="Select Video Directory", command=self.select_directory)
+        # self.dir_btn.pack(side=tk.LEFT, padx=10, pady=10)
         
-        self.clean_dir = tk.Button(self.root, text="Clean Directory", command=self.clean_directory)
-        self.clean_dir.pack()
+        # self.clean_dir = tk.Button(self.root, text="Clean Directory", command=self.clean_directory)
+        # self.clean_dir.pack(side=tk.LEFT, padx=10, pady=10)
         
-        self.process_btn = tk.Button(self.root, text="Run Model on Videos", command=self.run_model_on_directory)
-        self.process_btn.pack()
+        # self.process_btn = tk.Button(self.root, text="Run Model on Videos", command=self.run_model_on_directory)
+        # self.process_btn.pack(side=tk.LEFT, padx=10, pady=10)
+        
+        # self.llama_btn = tk.Button(self.root, text="Show corrected Sentence", command=lambda: self.run_llm(self.llm_words))
+        # self.llama_btn.pack(side=tk.RIGHT, padx=10, pady=10)
 
-        self.status_label = tk.Label(self.root, text="Status: Idle")
-        self.status_label.pack()
-        self.result_text = tk.Text(self.root, height=10)
-        self.result_text.pack()
+        # self.status_label = tk.Label(self.root, text="Status: Idle")
+        # self.status_label.pack()
+        # self.result_text = tk.Text(self.root, height=10)
+        # self.result_text.pack()
         
-        self.clear_btn = tk.Button(self.root,text="Clear Console", command=lambda: self.result_text.delete('1.0', tk.END))
-        self.clear_btn.pack()
+        # self.clear_btn = tk.Button(self.root,text="Clear Console", command=lambda: self.result_text.delete('1.0', tk.END))
+        # self.clear_btn.pack()
+         # Create frames for better organization
+        control_frame = tk.Frame(self.root)
+        control_frame.pack(pady=10)
+        
+        video_frame = tk.Frame(self.root)
+        video_frame.pack(pady=10)
+        
+        action_frame = tk.Frame(self.root)
+        action_frame.pack(pady=10)
+        
+        # Camera controls in top row
+        self.camera_btn = tk.Button(control_frame, text="Open Camera", command=self.toggle_camera, width=15)
+        self.camera_btn.grid(row=0, column=0, padx=5)
+        
+        self.landmark_btn = tk.Button(control_frame, text="Start Landmarks", command=self.toggle_landmark, width=15)
+        self.landmark_btn.grid(row=0, column=1, padx=5)
+        
+        # Video directory controls in middle row
+        self.dir_btn = tk.Button(video_frame, text="Select Video Directory", command=self.select_directory, width=20)
+        self.dir_btn.grid(row=0, column=0, padx=5)
+        
+        self.clean_dir = tk.Button(video_frame, text="Clean Directory", command=self.clean_directory, width=15)
+        self.clean_dir.grid(row=0, column=1, padx=5)
+        
+        # Processing controls in bottom row
+        self.process_btn = tk.Button(action_frame, text="Run Model on Videos", command=self.run_model_on_directory, width=20)
+        self.process_btn.grid(row=0, column=0, padx=5)
+        
+        self.llama_btn = tk.Button(action_frame, text="Show Corrected Sentence", command=lambda: self.run_llm(self.llm_words), width=20)
+        self.llama_btn.grid(row=0, column=1, padx=5)
+        
+        self.clear_btn = tk.Button(action_frame, text="Clear Console", command=lambda: self.result_text.delete('1.0', tk.END), width=15)
+        self.clear_btn.grid(row=0, column=2, padx=5)
+    
+        # Status and results
+        self.status_label = tk.Label(self.root, text="Status: Idle", font=('Arial', 10))
+        self.status_label.pack(pady=5)
+        
+        # Results text box with scrollbar
+        text_frame = tk.Frame(self.root)
+        text_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
+        scrollbar = tk.Scrollbar(text_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.result_text = tk.Text(text_frame, height=15, width=60, yscrollcommand=scrollbar.set)
+        self.result_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar.config(command=self.result_text.yview)
 
     def clean_directory(self):
         for fname in os.listdir(self.video_dir):
@@ -72,11 +125,22 @@ class GUI:
         if not self.camera_on:
             self.camera_on = True
             self.camera_btn.config(text="Close Camera")
+            self.llm_words = []
             threading.Thread(target=self.camera_loop, daemon=True).start()
         else:
             self.camera_on = False
             self.camera_btn.config(text="Open Camera")
 
+    def toggle_landmark(self):
+        if not self.landmark:
+            self.landmark = True
+            self.landmark_btn.config(text="Stop Landmarks")
+            threading.Thread(target=self.camera_loop, daemon=True).start()
+        else:
+            self.landmark = False
+            self.landmark_btn.config(text="Start Landmarks")
+
+    
     def camera_loop(self):
         cap = cv2.VideoCapture(0)
         recording = False
@@ -90,17 +154,20 @@ class GUI:
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
          
         data:dict = initialize_FrameModelOutput_Data()  
-        with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:    
+        with mp_holistic.Holistic(min_detection_confidence=0.50, min_tracking_confidence=0.5) as holistic:    
             while self.camera_on:
                 ret, frame = cap.read()
                 key = cv2.waitKey(1) & 0xFF
                 if ret:
                     cv2.imshow('Camera', frame)
+
+                    
                     
                     if recording:
                         modelOutput, image = getLandmarkOutput(frame, holistic) 
                         append_FrameModelOutput_Data(modelOutput, data)
-                        showLandmarksFrame(image, modelOutput)
+                        if self.landmark:
+                            showLandmarksFrame(image, modelOutput)
                     
                     if key == ord("r") and not recording:
                         output_filename = os.path.join(output_dir, f"{self.video_count}.mp4") # This is where we change the word for recording!
@@ -114,8 +181,11 @@ class GUI:
                         out.release()
                         print("Recording Stopped")
                         
-                        recording_result = self.model.predictDict(data)
-                        print(recording_result)
+                        prediction, confidence = self.model.predictDict(data)
+                        confidence = float(confidence)
+                        self.llm_words.append(prediction)
+                        self.result_text.insert(tk.END, f"{prediction}, {confidence*100}%\n")
+                        self.result_text.see(tk.END)
                         data = initialize_FrameModelOutput_Data()
                         
                         
@@ -141,40 +211,46 @@ class GUI:
         threading.Thread(target=self.process_videos, daemon=True).start()
 
     def process_videos(self):
-        results = []
         input_list = []
+        video_files = []
         for fname in os.listdir(self.video_dir):
             if fname.endswith('.mp4') or fname.endswith('.avi'):
                 video_path = os.path.join(self.video_dir, fname)
-                res = self.run_model(video_path) 
-                results.append(f"{fname}: {res}")
-                self.result_text.insert(tk.END, f"{fname}: {res}\n")
+                video_files.append(video_path)    
+         
+        predictions, confidence = self.model.predictFiles(video_files)
+        
+        
+        for fname, res, confidence in zip(video_files, predictions, confidence):
+            if fname.endswith('.mp4') or fname.endswith('.avi'):
+                fname = os.path.basename(fname)
+                self.result_text.insert(tk.END, f"{fname}: {res}, {int(confidence*100)}%\n")
                 self.result_text.see(tk.END)
                 self.result_text.update_idletasks()
                 input_list.append(res) ##creating a str list to pass to llm 
+                
+        self.run_llm(input_list)
         
+        
+    
+    def run_llm(self, input_list):
         # This is where we will call the llm to combine ouputs into sentence
-        llm_input = " ".join(input_list)
+        llm_input = ", ".join(input_list)
         # MODEL_PATH = "../../src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"
         MODEL_PATH = "./turnIn/src/frontend/llm_model/phi-2.Q4_K_M.gguf"
         # MODEL_PATH = os.path.join(PROJECT_ROOT, "llm_model", "phi-2.Q4_K_M.gguf")
         
-        
         llm = Llama(model_path=MODEL_PATH)
-        prompt = f"Make a correct and fluent English sentence using these words: {llm_input}"
-        # prompt = f"Make a correct and fluent English sentence using these words: I go School Yesterday"
-        response = llm(prompt, max_tokens=40, stop=["\n"])
+        prompt = f"Given these words: {llm_input} Rearange them to make a correct english sentence."
+        response = llm(prompt, max_tokens=1000, stop=["\n"])
         llm_output = response["choices"][0]["text"].strip()
         
         self.result_text.insert(tk.END, "\nCombined/Corrected Sentence:\n")
-        self.result_text.insert(tk.END, f"{llm_output}")
+        self.result_text.insert(tk.END, f"{llm_output}\n")
         self.status_label.config(text="Done.")
         
 
-    def run_model(self, video_path):
-        
-        
-        return "Model not implemented"
+
 
 if __name__ == "__main__":
     root = tk.Tk()

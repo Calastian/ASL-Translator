@@ -14,7 +14,9 @@ class Model():
     def predictDict(self, dataDict):
         assert self.model is not None, 'model not initialized'
         X = addingPaddingToPreProcessedData(pd.DataFrame([dataDict]), config.MAX_TOKENS) # wrap dict so it translates the sequnces as cells and not rows
-        return self.model.predict(X)
+        pred, con = self.model.predict(X)
+        return pred[0], con[0] 
+    
     def predictFiles(self, videoPaths):
         assert self.model is not None, 'model not initialized'
         X = makePreProcessedDataForFrontEndWithPadding(videoPaths, config.MAX_TOKENS)

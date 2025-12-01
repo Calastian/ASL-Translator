@@ -73,7 +73,7 @@ CHECKPOINTS = [ModelCheckpoint(
         mode="min"
 )]
 
-ACCELERATOR = 'auto'
+ACCELERATOR = 'gpu'
 DEVICES = 1 #set to negative one to use all available devices
 
 #%%

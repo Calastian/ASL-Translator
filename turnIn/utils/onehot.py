@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv('../src/training_data/christian_data/val.csv')
-key_df = pd.read_csv('../docs/Christian_Key_ASL.csv')
+df = pd.read_csv('.turnIn/src/training_data/christian_data/val.csv')
+key_df = pd.read_csv('.turnIn/docs/Christian_Key_ASL.csv')
 all_words = key_df['words'].tolist()
 print(f"Total words from key_asl.csv: {len(all_words)}")
 one_hot_matrix = np.zeros((len(df), len(all_words)))
