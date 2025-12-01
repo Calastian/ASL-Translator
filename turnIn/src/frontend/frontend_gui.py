@@ -101,6 +101,7 @@ class GUI:
             self.camera_btn.config(text="Close Camera")
             self.llm_words = []
             threading.Thread(target=self.camera_loop, daemon=True).start()
+            
         else:
             self.camera_on = False
             self.camera_btn.config(text="Open Camera")
@@ -197,8 +198,11 @@ class GUI:
         if not self.video_dir:
             messagebox.showerror("Error", "Please select a video directory first.")
             return
-        self.status_label.config(text="Processing...")
-        threading.Thread(target=self.process_videos, daemon=True).start()
+        if not self.camera_on:
+            self.status_label.config(text="Processing...")
+            threading.Thread(target=self.process_videos, daemon=True).start()
+        else:
+            messagebox.showerror("Error", "Please close camera first")
 
     def process_videos(self):
         input_list = []
