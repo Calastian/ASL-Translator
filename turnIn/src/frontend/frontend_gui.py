@@ -114,6 +114,8 @@ class GUI:
             else:
                 self.landmark = False
                 self.landmark_btn.config(text="Start Landmarks")
+        else: 
+            messagebox.showerror("Error", "Please close camera before changing landmarks")
 
     
     def camera_loop(self):
