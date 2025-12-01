@@ -5,7 +5,7 @@ import cv2
 import threading 
 import datetime as date
 from llama_cpp import Llama
-
+import time
 import mediapipe as mp
 import numpy as np
 mp_drawing = mp.solutions.drawing_utils
@@ -38,32 +38,6 @@ class GUI:
         self.model = Model("./turnIn/src/models/christian/ASL_Model_.ckpt")
     
     def setup_ui(self):
-        # self.camera_btn = tk.Button(self.root, text="Open Camera", command=self.toggle_camera)
-        # self.camera_btn.pack()
-        
-        # self.landmark_btn = tk.Button(self.root, text="Start Landmarks", command=self.toggle_landmark)
-        # self.landmark_btn.pack(side=tk.RIGHT, padx=10, pady=10)
-                
-        # self.dir_btn = tk.Button(self.root, text="Select Video Directory", command=self.select_directory)
-        # self.dir_btn.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        # self.clean_dir = tk.Button(self.root, text="Clean Directory", command=self.clean_directory)
-        # self.clean_dir.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        # self.process_btn = tk.Button(self.root, text="Run Model on Videos", command=self.run_model_on_directory)
-        # self.process_btn.pack(side=tk.LEFT, padx=10, pady=10)
-        
-        # self.llama_btn = tk.Button(self.root, text="Show corrected Sentence", command=lambda: self.run_llm(self.llm_words))
-        # self.llama_btn.pack(side=tk.RIGHT, padx=10, pady=10)
-
-        # self.status_label = tk.Label(self.root, text="Status: Idle")
-        # self.status_label.pack()
-        # self.result_text = tk.Text(self.root, height=10)
-        # self.result_text.pack()
-        
-        # self.clear_btn = tk.Button(self.root,text="Clear Console", command=lambda: self.result_text.delete('1.0', tk.END))
-        # self.clear_btn.pack()
-         # Create frames for better organization
         control_frame = tk.Frame(self.root)
         control_frame.pack(pady=10)
         
@@ -132,73 +106,89 @@ class GUI:
             self.camera_btn.config(text="Open Camera")
 
     def toggle_landmark(self):
-        if not self.landmark:
-            self.landmark = True
-            self.landmark_btn.config(text="Stop Landmarks")
-            threading.Thread(target=self.camera_loop, daemon=True).start()
-        else:
-            self.landmark = False
-            self.landmark_btn.config(text="Start Landmarks")
+        if not self.camera_on:
+            if not self.landmark:
+                self.landmark = True
+                self.landmark_btn.config(text="Stop Landmarks")
+            else:
+                self.landmark = False
+                self.landmark_btn.config(text="Start Landmarks")
 
     
     def camera_loop(self):
-        cap = cv2.VideoCapture(0)
-        recording = False
+        cap = None
         out = None
-        output_dir = self.output_dir
-        os.makedirs(output_dir, exist_ok=True)
-        datetime = date.datetime
-        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30 
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-         
-        data:dict = initialize_FrameModelOutput_Data()  
-        with mp_holistic.Holistic(min_detection_confidence=0.50, min_tracking_confidence=0.5) as holistic:    
-            while self.camera_on:
-                ret, frame = cap.read()
-                key = cv2.waitKey(1) & 0xFF
-                if ret:
-                    cv2.imshow('Camera', frame)
+        
+        try:
+            cap = cv2.VideoCapture(0)
+            recording = False
+            output_dir = self.output_dir
+            os.makedirs(output_dir, exist_ok=True)
+            datetime = date.datetime
+            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = int(cap.get(cv2.CAP_PROP_FPS)) or 30 
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
 
-                    
-                    
-                    if recording:
-                        modelOutput, image = getLandmarkOutput(frame, holistic) 
-                        append_FrameModelOutput_Data(modelOutput, data)
-                        if self.landmark:
-                            showLandmarksFrame(image, modelOutput)
-                    
-                    if key == ord("r") and not recording:
-                        output_filename = os.path.join(output_dir, f"{self.video_count}.mp4") # This is where we change the word for recording!
-                        out = cv2.VideoWriter(output_filename, fourcc, fps, (frame_width, frame_height))
-                        recording = True
-                        self.video_count += 1
-                        print(f"Recording started: {output_filename}")  
-                        
-                    elif key == ord('s') and recording:
-                        recording = False
-                        out.release()
-                        print("Recording Stopped")
-                        
-                        prediction, confidence = self.model.predictDict(data)
-                        confidence = float(confidence)
-                        self.llm_words.append(prediction)
-                        self.result_text.insert(tk.END, f"{prediction}, {confidence*100}%\n")
-                        self.result_text.see(tk.END)
-                        data = initialize_FrameModelOutput_Data()
-                        
-                        
-                    if recording:
-                        out.write(frame)
-                    
-                    if key == ord('q'):
-                        break
-        cap.release()
-        if out is not None:
-            out.release()
-        cv2.destroyAllWindows()
+            data:dict = initialize_FrameModelOutput_Data()  
+            with mp_holistic.Holistic(min_detection_confidence=0.50, min_tracking_confidence=0.5) as holistic:    
+                while self.camera_on:
+                    ret, frame = cap.read()
+                    key = cv2.waitKey(1) & 0xFF
+                    if ret:
+                        cv2.imshow('Camera', frame)
 
+
+
+                        if recording:
+                            modelOutput, image = getLandmarkOutput(frame, holistic) 
+                            append_FrameModelOutput_Data(modelOutput, data)
+                            if self.landmark:
+                                showLandmarksFrame(image, modelOutput)
+
+                        if key == ord("r") and not recording:
+                            output_filename = os.path.join(output_dir, f"{self.video_count}.mp4") # This is where we change the word for recording!
+                            out = cv2.VideoWriter(output_filename, fourcc, fps, (frame_width, frame_height))
+                            recording = True
+                            self.video_count += 1
+                            print(f"Recording started: {output_filename}")  
+
+                        elif key == ord('s') and recording:
+                            recording = False
+                            out.release()
+                            print("Recording Stopped")
+
+                            prediction, confidence = self.model.predictDict(data)
+                            confidence = float(confidence)
+                            self.llm_words.append(prediction)
+                            self.result_text.insert(tk.END, f"{prediction}, {confidence*100}%\n")
+                            self.result_text.see(tk.END)
+                            data = initialize_FrameModelOutput_Data()
+
+
+                        if recording:
+                            out.write(frame)
+
+                        if key == ord('q'):
+                            break
+                        
+                        if not self.camera_on:
+                            break
+        finally:
+            time.sleep(0.1)
+            if cap is not None:
+                cap.release()
+            if out is not None:
+                out.release()
+                
+            time.sleep(0.1)    
+            cv2.destroyAllWindows()
+            cv2.waitKey(1)
+        
+            self.camera_on = False
+            self.camera_btn.config(text="Open Camera")
+        
+        
     def select_directory(self):
         self.video_dir = filedialog.askdirectory()
         self.status_label.config(text=f"Selected dir: {self.video_dir}")

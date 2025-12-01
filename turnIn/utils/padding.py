@@ -1,8 +1,8 @@
 import pandas as pd
 import ast
 
-input_csv = '.turnIn/src/training_data/christian_data/val.csv'
-output_csv = '.turnIn/src/training_data/christian_data/padded_val.csv'
+input_csv = './turnIn/src/training_data/christian/val.csv'
+output_csv = './turnIn/src/training_data/christian/padded_val.csv'
 target_length = 266
 reference_col = 'poseLandmarks_present'  # this to determine sequence length
 pad_values = -999
@@ -87,6 +87,8 @@ cols = (
     [c for c in df.columns if c not in new_cols and c not in df.columns[:gloss_idx + 1]]
 )
 df = df[cols]
+
+df = df.drop(columns = ["orig_len"])
 
 df.to_csv(output_csv, index=False)
 
