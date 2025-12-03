@@ -1,0 +1,12 @@
+batch_first: true
+bias: false
+device: cuda
+dropOut: 0.3
+embed_dim: null
+hidden_size: 64
+input_features: 357
+max_tokens: 266
+num_heads: 1
+output_features: 172
+small_model: true
+use_pooling: true

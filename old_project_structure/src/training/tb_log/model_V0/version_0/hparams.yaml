@@ -1,0 +1,10 @@
+batch_first: true
+bias: false
+device: cuda
+dropOut: 0.1
+embed_dim: 93
+hidden_size: 186
+input_features: 357
+max_tokens: 266
+num_heads: 3
+output_features: 172
