@@ -19,3 +19,5 @@ ASL_Citizen/
 Finished_Output.csv
 *.ckpt
 .vscode/
+*.gguf
+*.mp4
