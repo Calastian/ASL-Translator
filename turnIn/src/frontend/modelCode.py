@@ -5,6 +5,11 @@ from ...utils.preprocess import makePreProcessedDataForFrontEndWithPadding, addi
 from .. import config
 
 class Model():
+    """Runs a prediction on the model class
+
+    Returns:
+        _type_: _description_
+    """
     model = None
     def __init__(self, path) -> None:
         if self.model is not None:

@@ -7,8 +7,12 @@ target_length = 266
 reference_col = 'poseLandmarks_present'  # this to determine sequence length
 pad_values = -999
 
-#create a converter to string-list into a Num list
 def parse_list(s):
+    """
+    Docstring for parse_list
+    create a converter to string-list into a Num list
+    
+    """
     if pd.isna(s):
         return []
     fixed = str(s).replace(',]',']')
@@ -17,15 +21,24 @@ def parse_list(s):
     except:
         return []
 
-# pad each sequence to target_length
+
 def pad_to_len(lst, wanted=target_length, pad_value=pad_values):
+    """
+     pads each sequence to target_length
+    Args:
+        lst (_type_): _description_
+        wanted (_type_, optional): _description_. Defaults to target_length.
+        pad_value (_type_, optional): _description_. Defaults to pad_values.
+
+    Returns:
+        _type_: _description_
+    """
     if len(lst) == 0:  # Handle empty lists
         return [pad_value] * wanted
     return lst + [pad_value] * (wanted - len(lst))
 
 df = pd.read_csv(input_csv)
 
-# Find all columns that contain list data (sequences that need padding)
 sequence_columns = []
 non_sequence_columns = ['Unnamed: 0', 'Video file', 'Gloss']  # These are not sequences
 

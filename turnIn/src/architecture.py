@@ -173,6 +173,11 @@ class Attention(nn.Module):
 
 
 class FeedForwardNetwork(nn.Module):
+    """
+    FeedForwardNetwork
+    
+    :vartype Note: num_heads
+    """
     def __init__(self, in_size:int, out_size:int, hidden_size:int|None=None, device=None):
         super().__init__()
         
@@ -194,18 +199,22 @@ class FeedForwardNetwork(nn.Module):
 
 # %%
 class Encoder(L.LightningModule):
-    
-    def __init__(self,input_features:int, output_features:int,max_tokens:int, embed_dim:int|None=None, 
-                 hidden_size:int|None=None, num_heads:int=1, batch_first:bool=True, lr=.0001, eps=.0001, dropOut:float=0., bias:bool=False,
-                 device=None):
-        """
+    """Encoder class
+ 
         Note: num_heads needs to divide embed_dim evenly in order to properly split up computation
         for parallelization
         
         If batch_first = True the input is expected to be of dimension (batch, seq, feature)
         
         If hidden_size remains None then there will be no FFN.
-        """
+        
+    Args:
+        L (_type_): 
+    """
+    def __init__(self,input_features:int, output_features:int,max_tokens:int, embed_dim:int|None=None, 
+                 hidden_size:int|None=None, num_heads:int=1, batch_first:bool=True, lr=.0001, eps=.0001, dropOut:float=0., bias:bool=False,
+                 device=None):
+       
         super().__init__()
         
         self.save_hyperparameters()#this is used for saving hyperparameters during callbacks
@@ -364,6 +373,9 @@ class Encoder(L.LightningModule):
     def predict(self, X):
         """
         This is the function that takes in input from a model and makes it proper output for our application
+        
+        Returns:
+            [list],tensor[list]: Returns predicted words and predicted confidence
         """
         tmpDF:pd.DataFrame = pd.read_csv(config.KEY_FILE)
         key:list = tmpDF['words'].tolist()

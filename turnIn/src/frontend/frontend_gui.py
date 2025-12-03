@@ -24,7 +24,15 @@ from ...utils.preprocess import getLandmarkOutput, append_FrameModelOutput_Data
 
 
 class GUI:
+    """_GUISummary_
+    GUI class to create the GUI instance to them pack and run integrations.
+    """
     def __init__(self, root):
+        """Init function to create a root for the UI and initialize our fields
+
+        Args:
+            root (class): Tkinter class
+        """
         self.root = root
         self.root.title("ASL GUI")
         self.camera_on = False
@@ -38,6 +46,8 @@ class GUI:
         self.model = Model("./turnIn/src/models/christian/ASL_Model_.ckpt")
     
     def setup_ui(self):
+        """ The setup method to create the frames and instances for each of the UI elements
+        """
         control_frame = tk.Frame(self.root)
         control_frame.pack(pady=10)
         
@@ -47,21 +57,18 @@ class GUI:
         action_frame = tk.Frame(self.root)
         action_frame.pack(pady=10)
         
-        # Camera controls in top row
         self.camera_btn = tk.Button(control_frame, text="Open Camera", command=self.toggle_camera, width=15)
         self.camera_btn.grid(row=0, column=0, padx=5)
         
         self.landmark_btn = tk.Button(control_frame, text="Start Landmarks", command=self.toggle_landmark, width=15)
         self.landmark_btn.grid(row=0, column=1, padx=5)
         
-        # Video directory controls in middle row
         self.dir_btn = tk.Button(video_frame, text="Select Video Directory", command=self.select_directory, width=20)
         self.dir_btn.grid(row=0, column=0, padx=5)
         
         self.clean_dir = tk.Button(video_frame, text="Clean Directory", command=self.clean_directory, width=15)
         self.clean_dir.grid(row=0, column=1, padx=5)
         
-        # Processing controls in bottom row
         self.process_btn = tk.Button(action_frame, text="Run Model on Videos", command=self.run_model_on_directory, width=20)
         self.process_btn.grid(row=0, column=0, padx=5)
         
@@ -71,11 +78,9 @@ class GUI:
         self.clear_btn = tk.Button(action_frame, text="Clear Console", command=lambda: self.result_text.delete('1.0', tk.END), width=15)
         self.clear_btn.grid(row=0, column=2, padx=5)
     
-        # Status and results
         self.status_label = tk.Label(self.root, text="Status: Idle", font=('Arial', 10))
         self.status_label.pack(pady=5)
         
-        # Results text box with scrollbar
         text_frame = tk.Frame(self.root)
         text_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 
@@ -88,6 +93,12 @@ class GUI:
         scrollbar.config(command=self.result_text.yview)
 
     def clean_directory(self):
+        """
+        Docstring for clean_directory
+        cleans out a directory from mp4 files
+        
+        :param self: passed from root.
+        """
         for fname in os.listdir(self.video_dir):
             if fname.endswith('.mp4'):
                 file_path = os.path.join(self.video_dir, fname)
@@ -96,6 +107,8 @@ class GUI:
 
 
     def toggle_camera(self):
+        """toggles the camera button on and off as well as sets the field variable
+        """
         if not self.camera_on:
             self.camera_on = True
             self.camera_btn.config(text="Close Camera")
@@ -107,6 +120,8 @@ class GUI:
             self.camera_btn.config(text="Open Camera")
 
     def toggle_landmark(self):
+        """toggles the landmark button off and on also sets the field variable
+        """
         if not self.camera_on:
             if not self.landmark:
                 self.landmark = True
@@ -119,6 +134,8 @@ class GUI:
 
     
     def camera_loop(self):
+        """Starts the camera loop itself as well as starts the Holistic model and the recording
+        """
         cap = None
         out = None
         
@@ -193,10 +210,14 @@ class GUI:
         
         
     def select_directory(self):
+        """Selects a directory for use
+        """
         self.video_dir = filedialog.askdirectory()
         self.status_label.config(text=f"Selected dir: {self.video_dir}")
 
     def run_model_on_directory(self):
+        """This method calls each video in a directory and passes it to the ASL model
+        """
         if not self.video_dir:
             messagebox.showerror("Error", "Please select a video directory first.")
             return
@@ -207,6 +228,10 @@ class GUI:
             messagebox.showerror("Error", "Please close camera first")
 
     def process_videos(self):
+        """This method calles the ASL models predict within a directory 
+        and then puts its results in the Tkinter textbox 
+        as well as runs the local llm
+        """
         input_list = []
         video_files = []
         for fname in os.listdir(self.video_dir):
@@ -230,6 +255,11 @@ class GUI:
         
     
     def run_llm(self, input_list):
+        """This method runs the Local Langauge Model on the given word list
+
+        Args:
+            input_list ([str]): list of strings
+        """
         # This is where we will call the llm to combine ouputs into sentence
         llm_input = ", ".join(input_list)
         # MODEL_PATH = "../../src/models/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf"

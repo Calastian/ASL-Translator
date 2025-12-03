@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 df = pd.read_csv('.turnIn/src/training_data/christian_data/val.csv')
 key_df = pd.read_csv('.turnIn/docs/Christian_Key_ASL.csv')
 all_words = key_df['words'].tolist()

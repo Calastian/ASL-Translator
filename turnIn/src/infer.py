@@ -7,6 +7,14 @@ from .architecture import Encoder
 from . import config
 
 def makeModel(modelFile):
+    """Creates an instance of the ASL model
+
+    Args:
+        modelFile (hyperparameters): the ASL model hyperparameters
+
+    Returns:
+        model:the ASL model
+    """
     model = Encoder(input_features=config.N_INPUTS, output_features=config.N_OUTPUTS,
                     embed_dim=config.N_EMBEDDINGS, max_tokens=config.MAX_TOKENS,
                     hidden_size=config.HIDDEN_SIZE, num_heads=config.N_HEADS,

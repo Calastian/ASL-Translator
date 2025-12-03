@@ -77,6 +77,11 @@ class ASLDataset(Dataset):
 
 
 class PreloadedASLDataset(Dataset):
+    """
+        This class helps us lazily load the data so memory doesn't blow up
+    Args:
+        Dataset (_type_): _description_
+    """
     def __init__(self, landmarkFile, oheFile, length, device=None):
         self.landmarkFile = landmarkFile
         self.oheFile = oheFile
