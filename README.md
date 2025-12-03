@@ -43,7 +43,7 @@ The first launch will install requirements automatically.
 
 ## Model File
 
-- The LLM model `ph-2.q4.gguf` is bundled in the `models/` directory.
+- The LLM model `ph-2.q4.gguf` is bundled in the `frontend/llm_model/` directory.
 - The ASL_Model `ASL_MODEL_.ckpt` is bundled in the `models/` directory.
 
 ## Custom Data
